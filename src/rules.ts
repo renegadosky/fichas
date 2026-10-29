@@ -14,47 +14,62 @@ export const CONDITIONS: { nome:string; dur:number|null; efeito:string; esq?:num
   { nome:'Cego', dur:null, efeito:'-4 em Pontaria e -2 na Esquiva', esq:-2 },
 ]
 // [nome, tipo, espaços, durabilidade, dano/efeito, bloqueio, mana]
-export const CATALOG: readonly (readonly [string,string,number,number,string,number?,number?])[] = [
-  // ==================== ARMAS DE CORTE — FERRO ====================
-['Espada Curta de Ferro', 'FOR ou AGI', 'Corte', 2, 26, '1d6 (corte)', '2 pratas'],
-['Espada Longa de Ferro', 'FOR ou AGI', 'Corte', 3, 30, '1d8 +1 (corte)', '8 pratas'],
-['Espada Larga de Ferro', 'FOR', 'Corte', 3, 32, '1d10 +3 (corte)', '15 pratas'],
 
-// ==================== ARCOS — FERRO ====================
-['Arco Curto Reforçado', 'AGI', 'Perfuração (Distância)', 2, 18, '1d6 (perfuração)', '6 pratas'],
-['Arco de Caça Reforçado', 'AGI', 'Perfuração (Distância)', 3, 22, '1d8 (perfuração)', '9 pratas'],
-['Arco Longo Reforçado', 'AGI ou FOR', 'Perfuração (Distância)', 4, 25, '1d8 +2 (perfuração)', '14 pratas'],
+export type CatalogItem = {
+  nome: string
+  atributo: string
+  tipo: string
+  espacos: number
+  durabilidade: number
+  dano: string
+  bloqueio: number
+  mana: number
+  preco: string
+}
 
-// ==================== ADAGAS — FERRO ====================
-['Faca de Ferro', 'AGI', 'Corte', 1, 16, '1d3 (corte)', '30 bronze'],
-['Adaga de Ferro', 'AGI', 'Perfuração', 1, 18, '1d4 +1 (estocada)', '50 bronze'],
-['Punhal de Ferro', 'AGI', 'Perfuração', 1, 20, '1d6 (estocada)', '8 pratas'],
+// Catálogo de equipamentos de Ferro.
+export const CATALOG: readonly CatalogItem[] = [
+  // ARMAS DE CORTE
+  { nome: 'Espada Curta de Ferro', atributo: 'FOR ou AGI', tipo: 'Corte', espacos: 2, durabilidade: 26, dano: '1d6 (corte)', bloqueio: 0, mana: 0, preco: '2 pratas' },
+  { nome: 'Espada Longa de Ferro', atributo: 'FOR ou AGI', tipo: 'Corte', espacos: 3, durabilidade: 30, dano: '1d8 +1 (corte)', bloqueio: 0, mana: 0, preco: '8 pratas' },
+  { nome: 'Espada Larga de Ferro', atributo: 'FOR', tipo: 'Corte', espacos: 3, durabilidade: 32, dano: '1d10 +3 (corte)', bloqueio: 0, mana: 0, preco: '15 pratas' },
 
-// ==================== CAJADOS — FERRO ====================
-['Cajado com Ponteira de Ferro', 'FOR ou AGI', 'Impacto', 2, 22, '1d4 +1 (impacto)', '+1 em testes de luta', '2 pratas'],
-['Cajado Reforçado de Ferro', 'FOR ou AGI', 'Impacto', 3, 25, '1d6 (impacto)', '+1 em testes de luta', '4 pratas'],
-['Cajado de Ferro Maciço', 'FOR', 'Impacto', 4, 28, '1d8 (impacto)', '+1 em testes de luta', '7 pratas'],
+  // ARCOS
+  { nome: 'Arco Curto Reforçado', atributo: 'AGI', tipo: 'Perfuração (Distância)', espacos: 2, durabilidade: 18, dano: '1d6 (perfuração)', bloqueio: 0, mana: 0, preco: '6 pratas' },
+  { nome: 'Arco de Caça Reforçado', atributo: 'AGI', tipo: 'Perfuração (Distância)', espacos: 3, durabilidade: 22, dano: '1d8 (perfuração)', bloqueio: 0, mana: 0, preco: '9 pratas' },
+  { nome: 'Arco Longo Reforçado', atributo: 'AGI ou FOR', tipo: 'Perfuração (Distância)', espacos: 4, durabilidade: 25, dano: '1d8 +2 (perfuração)', bloqueio: 0, mana: 0, preco: '14 pratas' },
 
-// ==================== ESCUDOS — FERRO ====================
-['Escudo Pequeno de Ferro', 'FOR', 'Defesa / Impacto', 1, 24, '+2 bloqueio', '1d2 (impacto)', '40 bronze'],
-['Escudo de Ferro', 'FOR', 'Defesa / Impacto', 2, 28, '+3 bloqueio', '1d3 (impacto)', '60 bronze'],
-['Escudo Pesado de Ferro', 'FOR', 'Defesa / Impacto', 3, 34, '+4 bloqueio', '1d4 (impacto)', '5 pratas'],
+  // ADAGAS
+  { nome: 'Faca de Ferro', atributo: 'AGI', tipo: 'Corte', espacos: 1, durabilidade: 16, dano: '1d3 (corte)', bloqueio: 0, mana: 0, preco: '30 bronze' },
+  { nome: 'Adaga de Ferro', atributo: 'AGI', tipo: 'Perfuração', espacos: 1, durabilidade: 18, dano: '1d4 +1 (estocada)', bloqueio: 0, mana: 0, preco: '50 bronze' },
+  { nome: 'Punhal de Ferro', atributo: 'AGI', tipo: 'Perfuração', espacos: 1, durabilidade: 20, dano: '1d6 (estocada)', bloqueio: 0, mana: 0, preco: '8 pratas' },
 
-// ==================== ARMADURAS — FERRO ====================
-['Peitoral de Ferro', 'FOR', 'Defesa', 3, 28, '+2 defesa', '6 pratas'],
-['Armadura de Ferro', 'FOR', 'Defesa', 5, 34, '+3 defesa', '12 pratas'],
-['Armadura Completa de Ferro', 'FOR', 'Defesa', 7, 40, '+5 defesa', '25 pratas'],
+  // CAJADOS
+  { nome: 'Cajado com Ponteira de Ferro', atributo: 'FOR ou AGI', tipo: 'Impacto', espacos: 2, durabilidade: 22, dano: '1d4 +1 (impacto)', bloqueio: 0, mana: 0, preco: '2 pratas' },
+  { nome: 'Cajado Reforçado de Ferro', atributo: 'FOR ou AGI', tipo: 'Impacto', espacos: 3, durabilidade: 25, dano: '1d6 (impacto)', bloqueio: 0, mana: 0, preco: '4 pratas' },
+  { nome: 'Cajado de Ferro Maciço', atributo: 'FOR', tipo: 'Impacto', espacos: 4, durabilidade: 28, dano: '1d8 (impacto)', bloqueio: 0, mana: 0, preco: '7 pratas' },
 
-// ==================== PORRETES — FERRO ====================
-['Clava com Reforço de Ferro', 'FOR', 'Impacto', 3, 24, '1d6 +1 (impacto)', '40 bronze'],
-['Maça de Ferro', 'FOR', 'Impacto', 3, 28, '1d8 (impacto)', '3 pratas'],
-['Maça Pesada de Ferro', 'FOR', 'Impacto', 4, 32, '1d10 +1 (impacto)', '7 pratas'],
+  // ESCUDOS
+  { nome: 'Escudo Pequeno de Ferro', atributo: 'FOR', tipo: 'Defesa / Impacto', espacos: 1, durabilidade: 24, dano: '1d2 (impacto)', bloqueio: 2, mana: 0, preco: '40 bronze' },
+  { nome: 'Escudo de Ferro', atributo: 'FOR', tipo: 'Defesa / Impacto', espacos: 2, durabilidade: 28, dano: '1d3 (impacto)', bloqueio: 3, mana: 0, preco: '60 bronze' },
+  { nome: 'Escudo Pesado de Ferro', atributo: 'FOR', tipo: 'Defesa / Impacto', espacos: 3, durabilidade: 34, dano: '1d4 (impacto)', bloqueio: 4, mana: 0, preco: '5 pratas' },
 
-// ==================== LANÇAS — FERRO ====================
-['Lança Curta de Ferro', 'FOR ou AGI', 'Perfuração', 3, 24, '1d6 +1 (estocada)', '2 pratas'],
-['Lança de Ferro', 'FOR ou AGI', 'Perfuração', 4, 28, '1d8 (estocada)', '4 pratas'],
-['Pique de Ferro', 'FOR', 'Perfuração', 5, 32, '1d10 +1 (estocada)', '8 pratas'],
+  // ARMADURAS
+  { nome: 'Peitoral de Ferro', atributo: 'FOR', tipo: 'Defesa', espacos: 3, durabilidade: 28, dano: '+2 defesa', bloqueio: 0, mana: 0, preco: '6 pratas' },
+  { nome: 'Armadura de Ferro', atributo: 'FOR', tipo: 'Defesa', espacos: 5, durabilidade: 34, dano: '+3 defesa', bloqueio: 0, mana: 0, preco: '12 pratas' },
+  { nome: 'Armadura Completa de Ferro', atributo: 'FOR', tipo: 'Defesa', espacos: 7, durabilidade: 40, dano: '+5 defesa', bloqueio: 0, mana: 0, preco: '25 pratas' },
+
+  // PORRETES
+  { nome: 'Clava com Reforço de Ferro', atributo: 'FOR', tipo: 'Impacto', espacos: 3, durabilidade: 24, dano: '1d6 +1 (impacto)', bloqueio: 0, mana: 0, preco: '40 bronze' },
+  { nome: 'Maça de Ferro', atributo: 'FOR', tipo: 'Impacto', espacos: 3, durabilidade: 28, dano: '1d8 (impacto)', bloqueio: 0, mana: 0, preco: '3 pratas' },
+  { nome: 'Maça Pesada de Ferro', atributo: 'FOR', tipo: 'Impacto', espacos: 4, durabilidade: 32, dano: '1d10 +1 (impacto)', bloqueio: 0, mana: 0, preco: '7 pratas' },
+
+  // LANÇAS
+  { nome: 'Lança Curta de Ferro', atributo: 'FOR ou AGI', tipo: 'Perfuração', espacos: 3, durabilidade: 24, dano: '1d6 +1 (estocada)', bloqueio: 0, mana: 0, preco: '2 pratas' },
+  { nome: 'Lança de Ferro', atributo: 'FOR ou AGI', tipo: 'Perfuração', espacos: 4, durabilidade: 28, dano: '1d8 (estocada)', bloqueio: 0, mana: 0, preco: '4 pratas' },
+  { nome: 'Pique de Ferro', atributo: 'FOR', tipo: 'Perfuração', espacos: 5, durabilidade: 32, dano: '1d10 +1 (estocada)', bloqueio: 0, mana: 0, preco: '8 pratas' },
 ]
+
 export type Equip = { id:string; nome:string; tipo:string; espacos:number; dur:number; durMax:number; dano:string; bloqueio:number; mana:number; equipado:boolean }
 export type Row = { id:string; [k:string]: any }
 export type Sheet = {
