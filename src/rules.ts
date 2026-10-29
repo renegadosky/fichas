@@ -15,14 +15,45 @@ export const CONDITIONS: { nome:string; dur:number|null; efeito:string; esq?:num
 ]
 // [nome, tipo, espaços, durabilidade, dano/efeito, bloqueio, mana]
 export const CATALOG: readonly (readonly [string,string,number,number,string,number?,number?])[] = [
-  ['Faca Enferrujada','Corte / Perfuração',1,4,'1d4 (estocada) / 2 (corte)'],['Clava Torta','Impacto',2,6,'1d4 (impacto)'],
-  ['Lança Improvisada','Perfuração',3,5,'1d4 (estocada)'],['Escudo Quebrado','Defesa / Impacto',2,6,'+1 Bloqueio / 1 Dano',1],
-  ['Cajado Ritual Goblin','Impacto',2,12,'2 Dano (+50 Mana Máxima)',0,50],['Espada Curta Usada','Corte / Perfuração',2,14,'1d4+1 (corte) / 1d4 (estocada)'],
-  ['Lança Militar Velha','Perfuração',3,16,'1d6 (estocada)'],['Machado de Batalha Gasto','Corte',3,18,'1d6 (corte)'],
-  ['Martelo Militar','Impacto',3,20,'1d6 (impacto)'],['Espada Longa','Corte / Perfuração',3,22,'1d8 (corte) / 1d6 (estocada)'],
-  ['Escudo Hobgoblin Gasto','Defesa / Impacto',2,15,'+2 Bloqueio / 2 Dano',2],['Escudo Pesado Hobgoblin','Defesa / Impacto',3,24,'+3 Bloqueio / 1d4 Dano',3],
-  ['Pistola de Pederneira','Perfuração',1,10,'1d8 (1 ação de recarga)'],['Sabre de Abordagem','Corte',2,18,'1d6+1 (corte)'],
-  ['Tridente de Aço-Nacarado','Perfuração',3,25,'1d8+2 (+1 em Luta na água)'],
+  // ==================== ARMAS DE CORTE — FERRO ====================
+['Espada Curta de Ferro', 'Corte', 2, 26, '1d6 (corte)'],
+['Espada Longa de Ferro', 'Corte', 3, 30, '1d8+1 (corte)'],
+['Espada Larga de Ferro', 'Corte', 3, 32, '1d10+3 (corte)'],
+
+// ==================== ARCOS — FERRO ====================
+['Arco Curto Reforçado', 'Perfuração (Distância)', 2, 18, '1d6 (perfuração)'],
+['Arco de Caça Reforçado', 'Perfuração (Distância)', 3, 22, '1d8 (perfuração)'],
+['Arco Longo Reforçado', 'Perfuração (Distância)', 4, 25, '1d8+2 (perfuração)'],
+
+// ==================== ADAGAS — FERRO ====================
+['Faca de Ferro', 'Corte', 1, 16, '1d3 (corte)'],
+['Adaga de Ferro', 'Perfuração', 1, 18, '1d4+1 (estocada)'],
+['Punhal de Ferro', 'Perfuração', 1, 20, '1d6 (estocada)'],
+
+// ==================== CAJADOS — FERRO ====================
+['Cajado com Ponteira de Ferro', 'Impacto', 2, 22, '1d4+1 (impacto) / +1 em testes de luta'],
+['Cajado Reforçado de Ferro', 'Impacto', 3, 25, '1d6 (impacto) / +1 em testes de luta'],
+['Cajado de Ferro Maciço', 'Impacto', 4, 28, '1d8 (impacto) / +1 em testes de luta'],
+
+// ==================== ESCUDOS — FERRO ====================
+['Escudo Pequeno de Ferro', 'Defesa / Impacto', 1, 24, '1d2 (impacto)', 2],
+['Escudo de Ferro', 'Defesa / Impacto', 2, 28, '1d3 (impacto)', 3],
+['Escudo Pesado de Ferro', 'Defesa / Impacto', 3, 34, '1d4 (impacto)', 4],
+
+// ==================== ARMADURAS — FERRO ====================
+['Peitoral de Ferro', 'Defesa', 3, 28, '+2 defesa'],
+['Armadura de Ferro', 'Defesa', 5, 34, '+3 defesa'],
+['Armadura Completa de Ferro', 'Defesa', 7, 40, '+5 defesa'],
+
+// ==================== PORRETES — FERRO ====================
+['Clava com Reforço de Ferro', 'Impacto', 3, 24, '1d6+1 (impacto)'],
+['Maça de Ferro', 'Impacto', 3, 28, '1d8 (impacto)'],
+['Maça Pesada de Ferro', 'Impacto', 4, 32, '1d10+1 (impacto)'],
+
+// ==================== LANÇAS — FERRO ====================
+['Lança Curta de Ferro', 'Perfuração', 3, 24, '1d6+1 (estocada)'],
+['Lança de Ferro', 'Perfuração', 4, 28, '1d8 (estocada)'],
+['Pique de Ferro', 'Perfuração', 5, 32, '1d10+1 (estocada)'],
 ]
 export type Equip = { id:string; nome:string; tipo:string; espacos:number; dur:number; durMax:number; dano:string; bloqueio:number; mana:number; equipado:boolean }
 export type Row = { id:string; [k:string]: any }
