@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ATTRS, ATTR_NAMES, COINS, RANKS, CONDITIONS, CATALOG, XP_THRESHOLDS, derive, normalize, clamp, levelInfo, pontos, skillTotal, rollDice, parseDice, type Sheet, type Row, type Equip, type Attr } from './rules'
+import { ATTRS, ATTR_NAMES, COINS, RANKS, CONDITIONS, CATALOG, XP_THRESHOLDS, derive, normalize, clamp, levelInfo, pontos, skillBonus, skillDice, skillLabel, diceCount, attackInfo, weaponAttr, weaponSkillId, rollDice, parseDice, type Sheet, type Row, type Equip, type Attr } from './rules'
 
 export const uid = () => crypto.randomUUID()
 const ok = (m:string) => confirm(m)
@@ -36,7 +36,24 @@ export function SheetView({ s, setS }: { s:Sheet; setS:(f:(s:Sheet)=>Sheet)=>voi
   const [log, setLog] = useState<string[]>([]); const [openEq, setOpenEq] = useState<string|null>(null); const [expr, setExpr] = useState('1d20')
   const P = (p:Partial<Sheet>) => setS(x=>normalize({ ...x, ...p }))
   const say = (t:string) => setLog(l=>[t,...l].slice(0,20))
-  const roll = (label:string, n:number, f:number, mod=0) => { const r = rollDice(n,f); const t = r.reduce((a,b)=>a+b,0)+mod
+  const sum = (r:number[]) => r.reduce((a,b)=>a+b,0)
+  const sgn = (v:number) => v>0 ? '+' : '−'
+  // Teste: nd20 (n vem do atributo) + partes fixas. Ex.: "[7 + 12 + 3] + 9 (AGI/3) + 5 (Pontaria) = 36"
+  const test = (n:number, parts:[string,number][]) => { const r = rollDice(n,20); const ex = parts.filter(p=>p[1]!==0)
+    const total = sum(r) + ex.reduce((t,p)=>t+p[1],0)
+    return { total, text:`[${r.join(' + ')}]${ex.map(([l,v])=>` ${sgn(v)} ${Math.abs(v)}${l?` (${l})`:''}`).join('')} = ${total}` } }
+  const rollAttr = (a:Attr) => { const v = a==='FOR'?d.forEfetiva:s.attrs[a]; say(`${ATTR_NAMES[a]} (${diceCount(v)}d20): ${test(diceCount(v),[]).text}`) }
+  const rollSkill = (p:Row) => say(`${p.nome||'Perícia'} (${skillLabel(s,p)}): ${test(skillDice(s,p),[['bônus',skillBonus(p)]]).text}`)
+  const rollEsq = () => say(`Esquiva (${d.esquivaDados}d20): ${test(d.esquivaDados,[['esquiva seca',d.esquiva]]).text}`)
+  const rollIni = () => ini && rollSkill(ini)
+  // Ataque + dano juntos numa mensagem só.
+  const attack = (e:Equip) => { const a = attackInfo(s,e), dd = parseDice(e.dano)
+    const atk = test(a.n,[[`${a.attr}/3`,a.mod],[a.periciaNome||'perícia',a.pericia],['acessório',a.acess]])
+    let dmg = ''
+    if (dd) { const r = rollDice(Math.min(dd.n,50),dd.f); const parts:[string,number][] = [['arma',dd.mod],[a.attr,a.val]].filter(p=>p[1]!==0) as any
+      dmg = ` | Dano: [${r.join(' + ')}]${parts.map(([l,v])=>` ${sgn(v)} ${Math.abs(v as number)} (${l})`).join('')} = ${sum(r)+parts.reduce((t,p)=>t+(p[1] as number),0)}` }
+    say(`${e.nome} — Ataque (${a.n}d20): ${atk.text}${dmg}`) }
+  const roll = (label:string, n:number, f:number, mod=0) => { const r = rollDice(n,f); const t = sum(r)+mod
     say(`${label}: ${r.join(' + ')}${mod?(mod>0?' + ':' − ')+Math.abs(mod):''} = ${t}`) }
   const rollExpr = () => { const dd = parseDice(expr); dd ? roll(expr.trim(), Math.min(dd.n,50), dd.f, dd.mod) : say('Use o formato 2d6+3') }
   const upP = (i:number, p:Partial<Row>) => P({ pericias:s.pericias.map((x,j)=>j===i?{...x,...p}:x) })
@@ -53,13 +70,13 @@ export function SheetView({ s, setS }: { s:Sheet; setS:(f:(s:Sheet)=>Sheet)=>voi
   const equipped = s.equip.filter(e=>e.equipado)
 
   const skills = <section className="panel"><h2>Perícias</h2>
-    <div className="sk shd"><span style={{width:36}}/><span className="sn">Perícia</span><span style={{width:66}}>Atrib.</span><span style={{width:56}}>Bônus</span><span style={{width:34}}>Total</span></div>
+    <div className="sk shd"><span style={{width:36}}/><span className="sn">Perícia</span><span style={{width:66}}>Atrib.</span><span style={{width:56}}>Bônus</span><span style={{width:62}}>Rolagem</span></div>
     {s.pericias.map((p,i)=><div className="sk" key={p.id}>
-      <button className="dc" title="d20 + total" onClick={()=>roll(p.nome||'Perícia',1,20,skillTotal(s,p))}>🎲</button>
+      <button className="dc" title="nd20 (pelo atributo) + bônus" onClick={()=>rollSkill(p)}>🎲</button>
       {p.base?<b className="sn">{p.nome}</b>:<input className="sn" placeholder="Nome" value={p.nome??''} onChange={e=>upP(i,{nome:e.target.value})}/>}
       <select value={p.attr??''} onChange={e=>upP(i,{attr:e.target.value})}><option value="">—</option>{ATTRS.map(a=><option key={a}>{a}</option>)}</select>
       <input type="number" className="bn" value={p.bonus??0} onChange={e=>upP(i,{bonus:clamp(+e.target.value,-99,999)})}/>
-      <b className="tot">{skillTotal(s,p)}</b>
+      <b className="tot">{skillLabel(s,p)}</b>
       {!p.base&&<button className="del dc" onClick={()=>ok('Remover perícia?')&&P({pericias:s.pericias.filter((_,j)=>j!==i)})}>🗑</button>}</div>)}
     <button className="pri" style={{marginTop:8}} onClick={()=>P({pericias:[...s.pericias,{id:uid(),nome:'',attr:'',bonus:0}]})}>+ Perícia</button></section>
 
@@ -73,15 +90,15 @@ export function SheetView({ s, setS }: { s:Sheet; setS:(f:(s:Sheet)=>Sheet)=>voi
       <div className="left">
         <section className="panel"><h2>Atributos <small className={pt.restantes<0?'neg':''}>{pt.restantes} pontos livres</small></h2>
           {ATTRS.map(a=><div className="al" key={a} style={{'--c':COLORS[a]} as any}>
-            <button className="dc" title="d20 + atributo" onClick={()=>roll(ATTR_NAMES[a],1,20,a==='FOR'?d.forEfetiva:s.attrs[a])}>🎲</button>
+            <button className="dc" title="nd20 pelo atributo" onClick={()=>rollAttr(a)}>🎲</button>
             <b className="aa">{a}</b><span className="lbl an">{ATTR_NAMES[a]}{a==='FOR'&&d.forEfetiva!==s.attrs.FOR?` (ef. ${d.forEfetiva})`:''}</span>
             <span className="num"><button onClick={()=>setAttr(a,s.attrs[a]-1)}>−</button><input type="number" value={s.attrs[a]} onChange={e=>setAttr(a,+e.target.value)}/><button onClick={()=>setAttr(a,s.attrs[a]+1)}>+</button></span></div>)}</section>
 
         <div className="xrow"><div className="lv">Nível <b>{lv.nivel}</b></div>
           <div style={{flex:1}}><div className="xb"><i style={{width:pct+'%'}}/></div><span className="lbl">{lv.proximo===null?'Nível máximo':`${s.xp} / ${lv.proximo} XP`}</span></div>
           <input type="number" min={0} value={gain} onChange={e=>setGain(Math.max(0,+e.target.value))} aria-label="XP ganho" style={{width:64}}/><button onClick={()=>{P({xp:s.xp+gain});setGain(0)}}>+ XP</button></div>
-        <div className="tiles"><div className="tile"><span className="lbl">Defesa</span><b>{d.defesa}</b></div><div className="tile"><span className="lbl">Esquiva Seca</span><b>{d.esquiva}</b></div>
-          <div className="tile"><span className="lbl">Iniciativa</span><b>{ini?skillTotal(s,ini):0}</b></div></div>
+        <div className="tiles"><div className="tile"><span className="lbl">Defesa</span><b>{d.defesa}</b></div><button className="tile" title="Rolar esquiva" onClick={rollEsq}><span className="lbl">Esquiva Seca</span><b>{d.esquiva}</b></button>
+          <button className="tile" title="Rolar iniciativa" onClick={rollIni} disabled={!ini}><span className="lbl">Iniciativa</span><b>{ini?skillLabel(s,ini):'—'}</b></button></div>
 
         <Bar label="PV" v={s.pv} max={d.pvMax} set={n=>P({pv:clamp(n,0,d.pvMax)})} color="#b3262b" step={step}/>
         <Bar label="MANA" v={s.mana} max={d.manaMax} set={n=>P({mana:clamp(n,0,d.manaMax)})} color="#2f6fe0" step={step}/>
@@ -97,8 +114,8 @@ export function SheetView({ s, setS }: { s:Sheet; setS:(f:(s:Sheet)=>Sheet)=>voi
         {tab==='Combate' && <section className="panel">
           <div className="row"><input style={{flex:1}} value={expr} onChange={e=>setExpr(e.target.value)} onKeyDown={e=>e.key==='Enter'&&rollExpr()} placeholder="Rolar dados (ex.: 2d6+3)"/><button className="pri" onClick={rollExpr}>🎲</button></div>
           <h2 style={{marginTop:14}}>Ataques</h2>
-          {equipped.length>0 ? equipped.map(e=>{ const dd=parseDice(e.dano); return <div className="wp" key={e.id}><div style={{flex:1}}><b>{e.nome}{e.dur<=0&&' (quebrado)'}</b><div className="lbl">{e.dano}</div></div>{dd&&<button className="pri" onClick={()=>roll(e.nome,dd.n,dd.f,dd.mod)}>🎲</button>}</div>}) : <p className="lbl">Equipe uma arma na aba Inventário.</p>}
-          <div className="row" style={{marginTop:8}}>{ini&&<button onClick={()=>roll('Iniciativa',1,20,skillTotal(s,ini))}>🎲 Iniciativa</button>}<button onClick={passTurn} disabled={!s.conds.length}>⏭ Passar turno</button></div>
+          {equipped.length>0 ? equipped.map(e=>{ const dd=parseDice(e.dano), a=attackInfo(s,e); return <div className="wp" key={e.id}><div style={{flex:1}}><b>{e.nome}{e.dur<=0&&' (quebrado)'}</b><div className="lbl">{e.dano} · {a.n}d20+{a.mod+a.pericia+a.acess} · dano +{a.val} ({a.attr})</div></div>{dd&&<button className="pri" title="Ataque + dano" onClick={()=>attack(e)}>🎲</button>}</div>}) : <p className="lbl">Equipe uma arma na aba Inventário.</p>}
+          <div className="row" style={{marginTop:8}}>{ini&&<button onClick={rollIni}>🎲 Iniciativa</button>}<button onClick={passTurn} disabled={!s.conds.length}>⏭ Passar turno</button></div>
           <h2 style={{marginTop:14}}>Condições</h2>
           <div className="chips">{CONDITIONS.map(c=><button key={c.nome} title={c.efeito} onClick={()=>addCond(c.nome)}>+ {c.nome}</button>)}</div>
           {s.conds.map((c,i)=><div className="wp" key={c.id}><div style={{flex:1}}><b>{c.nome}</b><div className="lbl">{CONDITIONS.find(x=>x.nome===c.nome)?.efeito}</div></div>
@@ -113,10 +130,13 @@ export function SheetView({ s, setS }: { s:Sheet; setS:(f:(s:Sheet)=>Sheet)=>voi
             {s.equip.map((e,i)=>{ const dd=parseDice(e.dano), op=openEq===e.id; return <div className="eq" key={e.id} style={e.dur<=0?{opacity:.55}:undefined}>
               <div className="row"><input type="checkbox" className="ck" checked={e.equipado} onChange={ev=>upE(i,{equipado:ev.target.checked})} title="Equipado"/>
                 <div style={{flex:1,minWidth:120}}><b>{e.nome||'(sem nome)'}</b><div className="lbl">{e.dano} · {e.dur}/{e.durMax}</div></div>
-                {dd&&<button onClick={()=>roll(e.nome,dd.n,dd.f,dd.mod)}>🎲</button>}<button onClick={()=>setOpenEq(op?null:e.id)}>{op?'▲':'✎'}</button></div>
+                {dd&&<button title="Ataque + dano" onClick={()=>attack(e)}>🎲</button>}<button onClick={()=>setOpenEq(op?null:e.id)}>{op?'▲':'✎'}</button></div>
               {op&&<div className="row" style={{marginTop:8}}><F l="Nome"><input value={e.nome} onChange={ev=>upE(i,{nome:ev.target.value})}/></F><F l="Tipo"><input value={e.tipo} onChange={ev=>upE(i,{tipo:ev.target.value})}/></F>
                 <F l="Dano / Efeito"><input value={e.dano} onChange={ev=>upE(i,{dano:ev.target.value})}/></F>
                 <F l={`Durabilidade (máx ${e.durMax})`}><Num v={e.dur} max={e.durMax} set={n=>upE(i,{dur:n})}/></F><F l="Espaços"><Num v={e.espacos} set={n=>upE(i,{espacos:n})}/></F>
+                <F l="Atributo (ataque/dano)"><select value={weaponAttr(e)} onChange={ev=>upE(i,{atq:ev.target.value as 'FOR'|'AGI'})}><option>FOR</option><option>AGI</option></select></F>
+                <F l="Perícia do ataque"><select value={weaponSkillId(e)} onChange={ev=>upE(i,{pericia:ev.target.value})}><option value="">—</option>{s.pericias.map(p=><option key={p.id} value={p.id}>{p.nome||'(sem nome)'}</option>)}</select></F>
+                <F l="Bônus (acessório)"><Num v={e.bonus??0} min={-99} set={n=>upE(i,{bonus:n})}/></F>
                 <F l="Bloqueio"><Num v={e.bloqueio} set={n=>upE(i,{bloqueio:n})}/></F><F l="Mana máx."><Num v={e.mana} set={n=>upE(i,{mana:n})}/></F>
                 <button className="del" onClick={()=>ok('Remover item?')&&P({equip:s.equip.filter((_,j)=>j!==i)})}>🗑 Remover</button></div>}</div>})}
             <div className="row"><select value="" onChange={e=>e.target.value!==''&&addCatalog(+e.target.value)}><option value="">+ Item do livro…</option>{CATALOG.map((c,i)=><option key={c[0]} value={i}>{c[0]}</option>)}</select>
