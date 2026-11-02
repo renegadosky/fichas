@@ -49,3 +49,4 @@ nav{border-bottom:1px solid var(--b);margin-bottom:12px;position:static}nav butt
 .al{display:flex;align-items:center;gap:8px;border-left:4px solid var(--c);background:linear-gradient(90deg,color-mix(in srgb,var(--c) 22%,transparent),transparent 75%);padding:4px 8px;border-radius:8px;margin-bottom:6px}
 .aa{width:38px;font-size:16px}.an{flex:1;min-width:0}.hist{margin-top:12px}
 .toast{left:auto!important;top:auto!important;right:10px;bottom:56px;transform:none!important}
+button.tile{color:inherit;font:inherit;cursor:pointer}button.tile:disabled{cursor:default;opacity:.6}.tot{width:62px!important;font-size:15px!important;white-space:nowrap}.toast{white-space:pre-wrap}
