@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { ATTRS, ATTR_NAMES, COINS, RANKS, CONDITIONS, CATALOG, XP_THRESHOLDS, derive, normalize, clamp, levelInfo, pontos, skillBonus, skillDice, skillLabel, diceCount, attackInfo, weaponAttr, weaponSkillId, rollDice, parseDice, type Sheet, type Row, type Equip, type Attr } from './rules'
 
-export const uid = () => crypto.randomUUID()
+import { uid, fileToAvatar, Avatar } from './ui'
+import type { GmItem } from './db'
 const ok = (m:string) => confirm(m)
 const COLORS: Record<string,string> = { FOR:'#e5484d', AGI:'#4cae4f', MEN:'#2f7cf6', CAR:'#e5b52f', VIT:'#9b59d0' }
 const COIN_COLORS = ['#b87333','#a8a8a8','#e5b52f','#bfe3ff','#b28cf0']
@@ -30,11 +31,11 @@ function Bar({ label, v, max, set, color, step }: { label:string; v:number; max:
       <button onClick={()=>set(v+1)} aria-label="+1">›</button><button onClick={()=>set(v+step)} aria-label={`+${step}`}>»</button></div></div>
 }
 
-export function SheetView({ s, setS }: { s:Sheet; setS:(f:(s:Sheet)=>Sheet)=>void }) {
+export function SheetView({ s, setS, ro=false, gmItems }: { s:Sheet; setS:(f:(s:Sheet)=>Sheet)=>void; ro?:boolean; gmItems?:GmItem[] }) {
   const d = derive(s), lv = levelInfo(s.xp), pt = pontos(s)
   const [tab, setTab] = useState('Combate'); const [step, setStep] = useState(5); const [gain, setGain] = useState(0)
   const [log, setLog] = useState<string[]>([]); const [openEq, setOpenEq] = useState<string|null>(null); const [expr, setExpr] = useState('1d20')
-  const P = (p:Partial<Sheet>) => setS(x=>normalize({ ...x, ...p }))
+  const P = (p:Partial<Sheet>) => { if (!ro) setS(x=>normalize({ ...x, ...p })) }  // somente leitura: nada altera a ficha
   const say = (t:string) => setLog(l=>[t,...l].slice(0,20))
   const sum = (r:number[]) => r.reduce((a,b)=>a+b,0)
   const sgn = (v:number) => v>0 ? '+' : '−'
@@ -44,7 +45,6 @@ export function SheetView({ s, setS }: { s:Sheet; setS:(f:(s:Sheet)=>Sheet)=>voi
     return { total, text:`[${r.join(' + ')}]${ex.map(([l,v])=>` ${sgn(v)} ${Math.abs(v)}${l?` (${l})`:''}`).join('')} = ${total}` } }
   const rollAttr = (a:Attr) => { const v = a==='FOR'?d.forEfetiva:s.attrs[a]; say(`${ATTR_NAMES[a]} (${diceCount(v)}d20): ${test(diceCount(v),[]).text}`) }
   const rollSkill = (p:Row) => say(`${p.nome||'Perícia'} (${skillLabel(s,p)}): ${test(skillDice(s,p),[['bônus',skillBonus(p)]]).text}`)
-  const rollEsq = () => say(`Esquiva (${d.esquivaDados}d20): ${test(d.esquivaDados,[['esquiva seca',d.esquiva]]).text}`)
   const rollIni = () => ini && rollSkill(ini)
   // Ataque + dano juntos numa mensagem só.
   const attack = (e:Equip) => { const a = attackInfo(s,e), dd = parseDice(e.dano)
@@ -66,6 +66,9 @@ export function SheetView({ s, setS }: { s:Sheet; setS:(f:(s:Sheet)=>Sheet)=>voi
     say(`Turno passou${lost.length?' — aplique: '+lost.join(', '):''}`) }
   const addCatalog = (i:number) => { const c = CATALOG[i]
     P({ equip:[...s.equip,{ id:uid(), nome:c[0], tipo:c[1], espacos:c[2], dur:c[3], durMax:c[3], dano:c[4], bloqueio:c[5]??0, mana:c[6]??0, equipado:false }] }) }
+  const addGm = (id:string) => { const g = gmItems?.find(x=>x.id===id)?.data; if (!g) return
+    if (g.cat==='equip') P({ equip:[...s.equip,{ id:uid(), nome:g.nome, tipo:g.tipo??'', espacos:g.espacos??0, dur:g.dur??0, durMax:g.durMax??g.dur??0, dano:g.dano??'', bloqueio:g.bloqueio??0, mana:g.mana??0, equipado:false, ...(g.atq?{atq:g.atq}:{}), ...(g.bonus?{bonus:g.bonus}:{}) }] })
+    else P({ inv:[...s.inv,{ id:uid(), nome:g.nome, qtd:g.qtd??1, desc:g.desc??'' }] }) }
   const base = XP_THRESHOLDS[lv.nivel-1], pct = lv.proximo===null ? 100 : 100*(s.xp-base)/(lv.proximo-base)
   const equipped = s.equip.filter(e=>e.equipado)
 
@@ -80,11 +83,15 @@ export function SheetView({ s, setS }: { s:Sheet; setS:(f:(s:Sheet)=>Sheet)=>voi
       {!p.base&&<button className="del dc" onClick={()=>ok('Remover perícia?')&&P({pericias:s.pericias.filter((_,j)=>j!==i)})}>🗑</button>}</div>)}
     <button className="pri" style={{marginTop:8}} onClick={()=>P({pericias:[...s.pericias,{id:uid(),nome:'',attr:'',bonus:0}]})}>+ Perícia</button></section>
 
-  return <div>
-    <section className="panel hdr"><F l="Personagem"><input value={s.nome} onChange={e=>P({nome:e.target.value})} placeholder="Nome"/></F>
+  return <div className={ro?'ro':''}>
+    <section className="panel hdr">
+      <div className="ph"><label className={ro?'':'clk'} title={ro?'':'Trocar foto'}><Avatar src={s.foto} name={s.nome} size={76}/>
+        {!ro&&<input type="file" accept="image/*" onChange={async e=>{ const f=e.target.files?.[0]; e.target.value=''; if(!f) return; try { P({foto:await fileToAvatar(f)}) } catch { alert('Não consegui ler essa imagem.') } }}/>}</label>
+        {!ro&&s.foto&&<button className="xph" title="Remover foto" onClick={()=>P({foto:''})}>✕</button>}</div>
+      <F l="Personagem"><input value={s.nome} onChange={e=>P({nome:e.target.value})} placeholder="Nome"/></F>
       <F l="Classe"><input value={s.classe} onChange={e=>P({classe:e.target.value})}/></F>
       <F l="Idade"><input type="number" value={s.idade??''} onChange={e=>P({idade:e.target.value===''?null:clamp(+e.target.value,0,10000)})}/></F>
-      <F l="Raça"><input value="Humano" disabled/></F></section>
+      <F l="Raça"><input value={s.raca??'Humano'} onChange={e=>P({raca:e.target.value})}/></F></section>
 
     <div className="sheet">
       <div className="left">
@@ -97,7 +104,7 @@ export function SheetView({ s, setS }: { s:Sheet; setS:(f:(s:Sheet)=>Sheet)=>voi
         <div className="xrow"><div className="lv">Nível <b>{lv.nivel}</b></div>
           <div style={{flex:1}}><div className="xb"><i style={{width:pct+'%'}}/></div><span className="lbl">{lv.proximo===null?'Nível máximo':`${s.xp} / ${lv.proximo} XP`}</span></div>
           <input type="number" min={0} value={gain} onChange={e=>setGain(Math.max(0,+e.target.value))} aria-label="XP ganho" style={{width:64}}/><button onClick={()=>{P({xp:s.xp+gain});setGain(0)}}>+ XP</button></div>
-        <div className="tiles"><div className="tile"><span className="lbl">Defesa</span><b>{d.defesa}</b></div><button className="tile" title="Rolar esquiva" onClick={rollEsq}><span className="lbl">Esquiva Seca</span><b>{d.esquiva}</b></button>
+        <div className="tiles"><div className="tile"><span className="lbl">Defesa</span><b>{d.defesa}</b></div><div className="tile" title="Valor fixo, não é um teste"><span className="lbl">Esquiva Seca</span><b>{d.esquiva}</b></div>
           <button className="tile" title="Rolar iniciativa" onClick={rollIni} disabled={!ini}><span className="lbl">Iniciativa</span><b>{ini?skillLabel(s,ini):'—'}</b></button></div>
 
         <Bar label="PV" v={s.pv} max={d.pvMax} set={n=>P({pv:clamp(n,0,d.pvMax)})} color="#b3262b" step={step}/>
@@ -140,6 +147,7 @@ export function SheetView({ s, setS }: { s:Sheet; setS:(f:(s:Sheet)=>Sheet)=>voi
                 <F l="Bloqueio"><Num v={e.bloqueio} set={n=>upE(i,{bloqueio:n})}/></F><F l="Mana máx."><Num v={e.mana} set={n=>upE(i,{mana:n})}/></F>
                 <button className="del" onClick={()=>ok('Remover item?')&&P({equip:s.equip.filter((_,j)=>j!==i)})}>🗑 Remover</button></div>}</div>})}
             <div className="row"><select value="" onChange={e=>e.target.value!==''&&addCatalog(+e.target.value)}><option value="">+ Item do livro…</option>{CATALOG.map((c,i)=><option key={c[0]} value={i}>{c[0]}</option>)}</select>
+              {!!gmItems?.length&&!ro&&<select value="" onChange={e=>e.target.value&&addGm(e.target.value)} title="Só o mestre enxerga estes itens"><option value="">+ Item do mestre…</option>{gmItems.map(g=><option key={g.id} value={g.id}>{g.data.nome} ({g.data.cat==='equip'?'equip.':'item'})</option>)}</select>}
               <button onClick={()=>{const id=uid();P({equip:[...s.equip,{id,nome:'',tipo:'',espacos:0,dur:0,durMax:0,dano:'',bloqueio:0,mana:0,equipado:false}]});setOpenEq(id)}}>+ Personalizado</button></div></section>
           <section className="panel"><h2>Itens</h2><Table cols={[{k:'nome',label:'Item'},{k:'qtd',label:'Qtd',t:'num'},{k:'desc',label:'Descrição'}]} rows={s.inv} onChange={r=>P({inv:r})} onAdd={()=>P({inv:[...s.inv,{id:uid(),nome:'',qtd:1,desc:''}]})}/></section>
           <section className="panel"><h2>Moedas</h2><div className="coins">{COINS.map((c,i)=><div className="coin" key={c}><span><i style={{background:COIN_COLORS[i]}}/>{c}</span><Num v={s.moedas[c]??0} set={n=>P({moedas:{...s.moedas,[c]:n}})}/></div>)}</div>
