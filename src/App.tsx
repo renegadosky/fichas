@@ -3,6 +3,7 @@ import { supabase } from './supabase'
 import { emptySheet, normalize } from './rules'
 import { Editor } from './Editor'
 import { GmArea } from './GmArea'
+import { CampaignPage } from './CampaignPage'
 import { Avatar } from './ui'
 import type { Rec, Mode, GmItem } from './db'
 
@@ -13,7 +14,7 @@ export default function App() {
   const [user, setUser] = useState<any>(null); const [ready, setReady] = useState(false); const [gm, setGm] = useState(false)
   const [list, setList] = useState<Rec[]>([]); const [group, setGroup] = useState<Rec[]>([]); const [campNames, setCampNames] = useState<Record<string,string>>({})
   const [open, setOpen] = useState<{ rec:Rec; mode:Mode }|null>(null); const [view, setView] = useState<'mine'|'gm'>('mine')
-  const [items, setItems] = useState<GmItem[]>([])
+  const [items, setItems] = useState<GmItem[]>([]); const [campView, setCampView] = useState<{ id:string; nome:string }|null>(null)
   const [email, setEmail] = useState(''); const [pw, setPw] = useState(''); const [msg, setMsg] = useState('')
   useEffect(() => { supabase.auth.getSession().then(({data})=>{ setUser(data.session?.user??null); setReady(true) })
     const { data:sub } = supabase.auth.onAuthStateChange((_e,s)=>setUser(s?.user??null)); return () => sub.subscription.unsubscribe() }, [])
@@ -43,7 +44,8 @@ export default function App() {
     <div className="row"><input style={{width:'100%'}} placeholder="E-mail" value={email} onChange={e=>setEmail(e.target.value)}/></div>
     <div className="row"><input style={{width:'100%'}} type="password" placeholder="Senha (mín. 6)" value={pw} onChange={e=>setPw(e.target.value)}/></div>
     <div className="row"><button className="pri" onClick={()=>auth(false)}>Entrar</button><button onClick={()=>auth(true)}>Cadastrar</button></div><p className="lbl">{msg}</p></div></div>
-  if (open) return <Editor key={open.rec.id} rec={open.rec} mode={open.mode} gmItems={gm?items:undefined} onBack={()=>setOpen(null)}/>
+  if (open) return <Editor key={open.rec.id} rec={open.rec} mode={open.mode} gmItems={gm?items:undefined} onBack={()=>setOpen(null)} onCampaign={c=>{ setCampView(c); setOpen(null) }}/>
+  if (campView) return <CampaignPage userId={user.id} camp={campView} onBack={()=>setCampView(null)} onOpen={(rec,mode)=>setOpen({ rec, mode })}/>
 
   const groups = Object.entries(group.reduce<Record<string,Rec[]>>((a,r)=>{ (a[r.campaign_id!] ??= []).push(r); return a }, {}))
   return <div className="wrap"><div className="row"><button className={view==='mine'?'pri':''} onClick={()=>setView('mine')}>Minhas fichas</button>
