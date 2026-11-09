@@ -4,7 +4,7 @@ import { normalize, emptySheet, type Sheet } from './rules'
 import { SheetView } from './SheetView'
 import type { Rec, Mode, GmItem, Campaign } from './db'
 
-export function Editor({ rec, mode, gmItems, onBack }: { rec:Rec; mode:Mode; gmItems?:GmItem[]; onBack:()=>void }) {
+export function Editor({ rec, mode, gmItems, onBack, onCampaign }: { rec:Rec; mode:Mode; gmItems?:GmItem[]; onBack:()=>void; onCampaign?:(c:{ id:string; nome:string })=>void }) {
   const ro = mode === 'ro', isOwner = mode === 'owner'
   const [s, setS] = useState<Sheet>(() => normalize({ ...emptySheet(), ...rec.data }))
   const [status, setStatus] = useState('Salvo')
@@ -46,7 +46,8 @@ export function Editor({ rec, mode, gmItems, onBack }: { rec:Rec; mode:Mode; gmI
   const badge = rec.kind==='npc' ? 'NPC' : rec.kind==='inimigo' ? 'Inimigo' : null
   return <div className="wrap"><div className="topbar"><button onClick={onBack}>← Voltar</button>
     {isOwner && rec.kind==='player' && (cid
-      ? <span className="cpill ok">🏰 {camp?.nome ?? 'Campanha'}<button className="mini" onClick={leave} title="Sair da campanha">Sair</button></span>
+      ? <><span className="cpill ok">🏰 {camp?.nome ?? 'Campanha'}<button className="mini" onClick={leave} title="Sair da campanha">Sair</button></span>
+        {onCampaign && <button className="cbtn" onClick={()=>onCampaign({ id:cid, nome:camp?.nome ?? 'Campanha' })}>👥 Ver campanha</button>}</>
       : <>
         <button className={`cbtn ${attach?'on':''}`} onClick={()=>{ setAttach(a=>!a); setErr('') }}>📎 Anexar a uma campanha</button>
         {attach && <input className="code" placeholder="Código da campanha" value={code} maxLength={10} autoFocus
