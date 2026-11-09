@@ -50,3 +50,23 @@ nav{border-bottom:1px solid var(--b);margin-bottom:12px;position:static}nav butt
 .aa{width:38px;font-size:16px}.an{flex:1;min-width:0}.hist{margin-top:12px}
 .toast{left:auto!important;top:auto!important;right:10px;bottom:56px;transform:none!important}
 button.tile{color:inherit;font:inherit;cursor:pointer}button.tile:disabled{cursor:default;opacity:.6}.tot{width:62px!important;font-size:15px!important;white-space:nowrap}.toast{white-space:pre-wrap}
+
+/* ===== campanhas, fotos, cartões ===== */
+.avt{display:inline-flex;align-items:center;justify-content:center;border-radius:50%;overflow:hidden;background:linear-gradient(135deg,#2a3a5c,#1a2438);border:2px solid var(--b);flex:0 0 auto}.avt img{width:100%;height:100%;object-fit:cover;display:block}.avt b{color:var(--m)}
+.hdr{grid-template-columns:90px 2fr 1.4fr 80px 130px}.ph{position:relative;display:flex;align-items:center;justify-content:center}.ph label.clk{cursor:pointer;display:block;border-radius:50%}.ph label.clk:hover .avt{border-color:var(--a)}.ph input[type=file]{display:none}
+.xph{position:absolute;top:-4px;right:2px;width:22px;min-width:22px;height:22px;min-height:22px;padding:0;border-radius:50%;font-size:11px;line-height:1}
+@media(max-width:820px){.hdr{grid-template-columns:90px 1fr 1fr}}
+.card{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:8px}.card .lbl{margin-top:2px}
+.codeb{background:var(--p2);border:1px dashed var(--a);border-radius:6px;padding:2px 8px;letter-spacing:.15em;font-family:ui-monospace,monospace;color:var(--t)}
+.topbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px}.topbar .cfg{margin-left:auto}
+.cbtn{background:linear-gradient(135deg,#2f7cf6,#7a4cf0);border:0;border-radius:999px;padding:8px 18px;color:#fff;font-weight:600;box-shadow:0 2px 10px rgba(47,124,246,.35);transition:transform .1s}
+.cbtn:hover:not(:disabled){transform:translateY(-1px);border:0}.cbtn.on{box-shadow:0 0 0 2px rgba(255,255,255,.25)}.cbtn.go{background:linear-gradient(135deg,#2fae6a,#2f9ad0);animation:pop .25s}
+@keyframes pop{from{opacity:0;transform:scale(.85)}to{opacity:1;transform:none}}
+.code{width:170px;border-radius:999px;text-align:center;letter-spacing:.2em;font-family:ui-monospace,monospace;text-transform:uppercase;border-color:var(--a)}
+.cpill{display:inline-flex;align-items:center;gap:8px;background:var(--p2);border:1px solid var(--b);border-radius:999px;padding:6px 14px;font-size:13px}.cpill.ok{border-color:#2fae6a;background:rgba(47,174,106,.12)}
+.mini{min-height:26px;padding:0 10px;font-size:12px;border-radius:999px}
+.cfg.on{border-color:var(--a)}.cfgp{border-color:var(--a)}.sw{display:flex;gap:12px;align-items:flex-start;cursor:pointer}.sw input{width:20px;height:20px;min-height:0;margin-top:3px}
+.info{background:rgba(47,124,246,.12);border:1px solid var(--a);border-radius:8px;padding:8px 12px;margin-bottom:12px;font-size:13px}
+.ro .num button,.ro .bb button,.ro .bb input,.ro .num input,.ro .xrow input,.ro .xrow button,.ro .chips button,.ro .del,.ro .eq .ck,.ro .sk select,.ro .sk input,.ro .al input,.ro .hdr input,.ro textarea,.ro .qty,.ro .wp .num{pointer-events:none;opacity:.85}
+.ro .eq .row button:not([title="Ataque + dano"]),.ro .sk .del,.ro details .num{pointer-events:none}
+h3{font-size:18px}
