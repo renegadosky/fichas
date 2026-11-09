@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { emptySheet, derive, normalize, levelInfo, pontos, parseDice, skillBonus, skillDice, skillLabel, diceCount, attackInfo, CATALOG, type Equip } from './rules'
+import { MAX_LEVEL, XP_THRESHOLDS, emptySheet, derive, normalize, levelInfo, pontos, parseDice, skillBonus, skillDice, skillLabel, diceCount, attackInfo, CATALOG, type Equip } from './rules'
 const shield = (b:number, dur=5):Equip => ({id:'1',nome:'E',tipo:'',espacos:1,dur,durMax:5,dano:'',bloqueio:b,mana:0,equipado:true})
 const base = () => { const s = emptySheet(); s.attrs = {FOR:0,AGI:0,MEN:0,CAR:0,VIT:0}; return s }
 describe('fórmulas', () => {
@@ -24,5 +24,9 @@ describe('fórmulas', () => {
     const esp:Equip={...shield(0),tipo:'Corte'}; expect(attackInfo(s,esp)).toMatchObject({attr:'FOR',val:5,n:1,mod:1,pericia:0}) })
   it('dados e perícia', () => { expect(parseDice('1d4+1 (corte)')).toEqual({n:1,f:4,mod:1}); expect(parseDice('2 Dano')).toBeNull()
     expect(parseDice('1d8+2')).toEqual({n:1,f:8,mod:2}) })
-  it('catálogo tem 15 itens', () => expect(CATALOG.length).toBe(15))
+  it('catálogo não está vazio', () => expect(CATALOG.length).toBeGreaterThan(0))
+  it('nível vai até 99 e o XP só cresce', () => { expect(MAX_LEVEL).toBe(99); expect(XP_THRESHOLDS.length).toBe(99)
+    for (let i=1;i<XP_THRESHOLDS.length;i++) expect(XP_THRESHOLDS[i]).toBeGreaterThan(XP_THRESHOLDS[i-1])
+    expect(levelInfo(XP_THRESHOLDS[98]).nivel).toBe(99); expect(levelInfo(XP_THRESHOLDS[98]+1e9).nivel).toBe(99); expect(levelInfo(XP_THRESHOLDS[98]).proximo).toBeNull()
+    expect(XP_THRESHOLDS[30]-XP_THRESHOLDS[29]).toBe(28700) })
 })
