@@ -59,16 +59,20 @@ export type Equip = { id:string; nome:string; tipo:string; espacos:number; dur:n
   atq?:'FOR'|'AGI'; pericia?:string; bonus?:number }  // atq = atributo do ataque/dano; pericia = id da perícia usada; bonus = acessório
 export type Row = { id:string; [k:string]: any }
 export type Sheet = {
-  nome:string; idade:number|null; classe:string; nivel:number; xp:number; attrs:Record<Attr,number>
+  nome:string; idade:number|null; classe:string; raca?:string; foto?:string; nivel:number; xp:number; attrs:Record<Attr,number>
   pv:number; mana:number; aura:number; conds:Row[]; pericias:Row[]; equip:Equip[]; inv:Row[]; habs:Row[]
   moedas:Record<string,number>; pedras:Record<string,number>; historico:string; notas:string }
 export const ATTR_BASE = 5          // todos os atributos começam em 5
 export const POINTS_PER_LEVEL = 3   // pontos de atributo ganhos por nível (já no nível 1)
-export const MAX_LEVEL = 30
+export const MAX_LEVEL = 99
 // Tabela de XP informada pelo mestre. Interpretada como CUSTO para avançar a cada nível
 // (nível 2 = 150, nível 3 = +200...). Se for XP TOTAL acumulado, troque para true.
 const XP_CUMULATIVE = false
-const XP_COSTS = [150,200,250,350,450,600,800,1050,1350,1700,2100,2600,3200,3900,4700,5600,6600,7700,8900,10200,11600,13100,14700,16400,18200,20100,22100,24200,26400]
+const XP_COSTS_BOOK = [150,200,250,350,450,600,800,1050,1350,1700,2100,2600,3200,3900,4700,5600,6600,7700,8900,10200,11600,13100,14700,16400,18200,20100,22100,24200,26400]
+// Do nível 31 ao 99 o custo continua crescendo no mesmo ritmo do fim da tabela
+// (a diferença entre um custo e o anterior sobe +100 a cada nível: ..., 2100, 2200, 2300, 2400...).
+const XP_COSTS: number[] = (() => { const c=[...XP_COSTS_BOOK]; let diff=c[c.length-1]-c[c.length-2]
+  while (c.length < MAX_LEVEL-1) { diff+=100; c.push(c[c.length-1]+diff) } return c })()
 export const XP_THRESHOLDS: number[] = (() => { const t=[0]; XP_COSTS.forEach((c,i)=>t.push(XP_CUMULATIVE?c:t[i]+c)); return t })()
 export function levelInfo(xp:number) {
   let nivel = 1; XP_THRESHOLDS.forEach((t,i)=>{ if (xp>=t) nivel=i+1 })
@@ -114,9 +118,8 @@ export function derive(s:Sheet) {
     pvMax: s.attrs.VIT*5 + s.nivel*5,
     auraMax: FOR*10,
     manaMax: s.attrs.MEN*10 + worn(s).reduce((t,e)=>t+e.mana,0),
-    // Esquiva Seca (sem dados) = AGI/3 + bônus de Reflexo + condições. Rolada: nd20 (AGI) + esse valor.
+    // Esquiva Seca NÃO é teste (sem dados): AGI/3 + bônus de Reflexo + condições.
     esquiva: Math.floor(s.attrs.AGI/3) + reflexo + mod('esq'),
-    esquivaDados: diceCount(s.attrs.AGI),
     defesa: 5 + s.nivel + Math.floor(s.attrs.VIT/5) + bloqueio,
   }
 }
