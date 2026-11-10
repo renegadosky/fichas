@@ -36,14 +36,26 @@ export default function App() {
     setGroup((g.data ?? []) as Rec[]); setCampNames(Object.fromEntries(((c.data ?? []) as any[]).map(x=>[x.id,x.nome]))) }
   useEffect(() => { if (!open) load() }, [user, view, open])
 
-  const auth = async (up:boolean) => { setMsg(''); const r = up ? await supabase.auth.signUp({email,password:pw}) : await supabase.auth.signInWithPassword({email,password:pw}); if (r.error) setMsg(r.error.message); else if (up && !r.data.session) setMsg('Confirme seu e-mail para entrar.') }
+  const traduz = (m:string) => /rate limit|too many|over_email_send_rate_limit/i.test(m) ? 'Limite de e-mails atingido. Espere cerca de 1 hora e tente de novo (ou peça ao mestre para desligar a confirmação por e-mail).'
+    : /already registered|already been registered/i.test(m) ? 'Este e-mail já tem cadastro. Use "Entrar" ou "Reenviar e-mail de confirmação".'
+    : /invalid login|invalid credentials/i.test(m) ? 'E-mail ou senha incorretos.'
+    : /not confirmed/i.test(m) ? 'E-mail ainda não confirmado. Veja a caixa de entrada e o spam, ou clique em "Reenviar e-mail de confirmação".'
+    : /password/i.test(m) && /6|short|weak/i.test(m) ? 'A senha precisa ter pelo menos 6 caracteres.'
+    : /valid email|invalid.*email/i.test(m) ? 'E-mail inválido.' : m
+  const redirect = window.location.origin + window.location.pathname
+  const auth = async (up:boolean) => { setMsg(''); if (!email.trim() || !pw) { setMsg('Preencha e-mail e senha.'); return }
+    const r = up ? await supabase.auth.signUp({ email:email.trim(), password:pw, options:{ emailRedirectTo: redirect } }) : await supabase.auth.signInWithPassword({ email:email.trim(), password:pw })
+    if (r.error) setMsg(traduz(r.error.message))
+    else if (up && !r.data.session) setMsg(r.data.user && r.data.user.identities?.length === 0 ? 'Este e-mail já tem cadastro. Use "Entrar".' : 'Enviamos um e-mail de confirmação. Confira a caixa de entrada e também o spam.') }
+  const reenviar = async () => { setMsg(''); if (!email.trim()) { setMsg('Digite seu e-mail acima.'); return }
+    const r = await supabase.auth.resend({ type:'signup', email:email.trim(), options:{ emailRedirectTo: redirect } }); setMsg(r.error ? traduz(r.error.message) : 'E-mail reenviado. Confira também o spam.') }
   const create = async () => { const { data, error } = await supabase.from('sheets').insert({ data: emptySheet() }).select().single(); if (error) setMsg(error.message); else setOpen({ rec:data as Rec, mode:'owner' }) }
   const remove = async (id:string) => { if (ok('Excluir esta ficha definitivamente?')) { await supabase.from('sheets').delete().eq('id',id); load() } }
   if (!ready) return <div className="wrap">Carregando…</div>
   if (!user) return <div className="wrap"><div className="panel" style={{maxWidth:360,margin:'40px auto'}}><h2>Ficha de RPG</h2>
     <div className="row"><input style={{width:'100%'}} placeholder="E-mail" value={email} onChange={e=>setEmail(e.target.value)}/></div>
     <div className="row"><input style={{width:'100%'}} type="password" placeholder="Senha (mín. 6)" value={pw} onChange={e=>setPw(e.target.value)}/></div>
-    <div className="row"><button className="pri" onClick={()=>auth(false)}>Entrar</button><button onClick={()=>auth(true)}>Cadastrar</button></div><p className="lbl">{msg}</p></div></div>
+    <div className="row"><button className="pri" onClick={()=>auth(false)}>Entrar</button><button onClick={()=>auth(true)}>Cadastrar</button></div><div className="row"><button onClick={reenviar}>Reenviar e-mail de confirmação</button></div><p className="lbl">{msg}</p></div></div>
   if (open) return <Editor key={open.rec.id} rec={open.rec} mode={open.mode} gmItems={gm?items:undefined} onBack={()=>setOpen(null)} onCampaign={c=>{ setCampView(c); setOpen(null) }}/>
   if (campView) return <CampaignPage userId={user.id} camp={campView} onBack={()=>setCampView(null)} onOpen={(rec,mode)=>setOpen({ rec, mode })}/>
 
