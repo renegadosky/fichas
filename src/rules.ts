@@ -112,14 +112,13 @@ export function derive(s:Sheet) {
   const mod = (k:'esq'|'FOR') => active(s).reduce((t,c)=>t+(c[k]??0),0)
   const FOR = s.attrs.FOR + mod('FOR')
   const bloqueio = worn(s).reduce((t,e)=>t+e.bloqueio,0)
-  const reflexo = s.pericias.find(p=>p.nome==='Reflexo')?.bonus ?? 0
   return {
     forEfetiva: FOR,
     pvMax: s.attrs.VIT*5 + s.nivel*5,
     auraMax: FOR*10,
     manaMax: s.attrs.MEN*10 + worn(s).reduce((t,e)=>t+e.mana,0),
-    // Esquiva Seca NÃO é teste (sem dados): AGI/3 + bônus de Reflexo + condições.
-    esquiva: Math.floor(s.attrs.AGI/3) + reflexo + mod('esq'),
+    // Esquiva Seca NÃO é teste (sem dados): média de AGI e VIT (valor fixo) + condições.
+    esquiva: Math.floor((s.attrs.AGI + s.attrs.VIT)/2) + mod('esq'),
     defesa: 5 + s.nivel + Math.floor(s.attrs.VIT/5) + bloqueio,
   }
 }
