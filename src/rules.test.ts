@@ -7,8 +7,8 @@ describe('fórmulas', () => {
   it('Aura e Mana', () => { const s=base(); s.attrs.FOR=6; s.attrs.MEN=5; const d=derive(s); expect(d.auraMax).toBe(60); expect(d.manaMax).toBe(50) })
   it('Defesa', () => { const s=base(); s.nivel=2; s.attrs.VIT=7; expect(derive(s).defesa).toBe(8)
     s.equip=[shield(2)]; expect(derive(s).defesa).toBe(10); s.equip=[shield(2,0)]; expect(derive(s).defesa).toBe(8) })
-  it('Esquiva seca = AGI/3 + bônus de Reflexo + condições', () => { const s=base(); s.attrs.AGI=9; s.pericias.find(p=>p.nome==='Reflexo')!.bonus=5
-    expect(derive(s).esquiva).toBe(8); s.conds=[{id:'a',nome:'Cansado'},{id:'b',nome:'Cego'}]; expect(derive(s).esquiva).toBe(4) })
+  it('Esquiva seca = média de AGI e VIT + condições', () => { const s=base(); s.attrs.AGI=9; s.attrs.VIT=6
+    expect(derive(s).esquiva).toBe(7); s.conds=[{id:'a',nome:'Cansado'},{id:'b',nome:'Cego'}]; expect(derive(s).esquiva).toBe(3) })
   it('Cajado +50 mana', () => { const s=base(); s.equip=[{...shield(0),mana:50}]; expect(derive(s).manaMax).toBe(50) })
   it('Normalizar não restaura recursos', () => { const s=base(); s.attrs.VIT=10; s.pv=30; expect(normalize(s).pv).toBe(30) })
   it('Ficha nova: atributos 5 e perícias base', () => { const s=emptySheet(); expect(Object.values(s.attrs)).toEqual([5,5,5,5,5]); expect(s.pericias.length).toBe(5) })
