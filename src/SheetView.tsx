@@ -130,7 +130,7 @@ export function SheetView({ s, setS, ro=false, gmItems }: { s:Sheet; setS:(f:(s:
 
         {tab==='Perícias' && <div className="only-m">{skills}</div>}
 
-        {tab==='Habilidades' && <section className="panel"><Table cols={[{k:'nome',label:'Nome'},{k:'custo',label:'Custo'},{k:'desc',label:'Efeito'},{k:'usos',label:'Usos',t:'num'}]} rows={s.habs} onChange={r=>P({habs:r})} onAdd={()=>P({habs:[...s.habs,{id:uid(),nome:'',custo:'',desc:'',usos:0}]})}/></section>}
+        {tab==='Habilidades' && <section className="panel"><Table cols={[{k:'nome',label:'Nome'},{k:'custo',label:'Custo'},{k:'desc',label:'Efeito'}]} rows={s.habs} onChange={r=>P({habs:r})} onAdd={()=>P({habs:[...s.habs,{id:uid(),nome:'',custo:'',desc:''}]})}/></section>}
 
         {tab==='Inventário' && <>
           <section className="panel"><h2>Equipamentos</h2>
