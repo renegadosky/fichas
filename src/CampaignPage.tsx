@@ -1,76 +1,24 @@
 import { useEffect, useState } from 'react'
 import { supabase } from './supabase'
-import { emptySheet, normalize } from './rules'
-import { Editor } from './Editor'
-import { GmArea, GM_NAV0, type GmNav } from './GmArea'
-import { CampaignPage } from './CampaignPage'
+import { emptySheet, normalize, derive } from './rules'
 import { Avatar } from './ui'
-import type { Rec, Mode, GmItem } from './db'
+import type { Rec, Mode } from './db'
 
-const ok = (m:string) => confirm(m)
-const nm = (r:Rec) => normalize({ ...emptySheet(), ...r.data })
-
-export default function App() {
-  const [user, setUser] = useState<any>(null); const [ready, setReady] = useState(false); const [gm, setGm] = useState(false)
-  const [list, setList] = useState<Rec[]>([]); const [group, setGroup] = useState<Rec[]>([]); const [campNames, setCampNames] = useState<Record<string,string>>({})
-  const [open, setOpen] = useState<{ rec:Rec; mode:Mode }|null>(null); const [view, setView] = useState<'mine'|'gm'>('mine')
-  const [items, setItems] = useState<GmItem[]>([]); const [gmNav, setGmNav] = useState<GmNav>(GM_NAV0); const [campView, setCampView] = useState<{ id:string; nome:string }|null>(null)
-  const [email, setEmail] = useState(''); const [pw, setPw] = useState(''); const [msg, setMsg] = useState('')
-  useEffect(() => { supabase.auth.getSession().then(({data})=>{ setUser(data.session?.user??null); setReady(true) })
-    const { data:sub } = supabase.auth.onAuthStateChange((_e,s)=>setUser(s?.user??null)); return () => sub.subscription.unsubscribe() }, [])
-
-  const loadItems = async () => { const { data } = await supabase.from('gm_items').select('id,data').order('created_at'); setItems((data ?? []) as GmItem[]) }
-  const load = async () => { if (!user) return
-    const { data:p } = await supabase.from('profiles').select('role').eq('id',user.id).single(); const isGm = p?.role==='gm'; setGm(isGm)
-    if (isGm) loadItems()
-    // minhas fichas de personagem (NPCs e inimigos ficam só na Área do mestre)
-    const { data, error } = await supabase.from('sheets').select('*').eq('owner_id',user.id).eq('kind','player').order('updated_at',{ascending:false})
-    if (error) return setMsg(error.message)
-    const mine = data as Rec[]; setList(mine); setMsg('')
-    // fichas de outros jogadores das campanhas em que estou (o banco só entrega as que foram liberadas)
-    const cids = [...new Set(mine.map(r=>r.campaign_id).filter(Boolean))] as string[]
-    if (!cids.length) { setGroup([]); setCampNames({}); return }
-    const [g, c] = await Promise.all([
-      supabase.from('sheets').select('*').eq('kind','player').neq('owner_id',user.id).in('campaign_id',cids).order('updated_at',{ascending:false}),
-      supabase.from('campaigns').select('id,nome').in('id',cids) ])
-    setGroup((g.data ?? []) as Rec[]); setCampNames(Object.fromEntries(((c.data ?? []) as any[]).map(x=>[x.id,x.nome]))) }
-  useEffect(() => { if (!open) load() }, [user, view, open])
-
-  const traduz = (m:string) => /rate limit|too many|over_email_send_rate_limit/i.test(m) ? 'Limite de e-mails atingido. Espere cerca de 1 hora e tente de novo (ou peça ao mestre para desligar a confirmação por e-mail).'
-    : /already registered|already been registered/i.test(m) ? 'Este e-mail já tem cadastro. Use "Entrar".'
-    : /invalid login|invalid credentials/i.test(m) ? 'E-mail ou senha incorretos.'
-    : /not confirmed/i.test(m) ? 'E-mail ainda não confirmado. Veja a caixa de entrada e o spam.'
-    : /password/i.test(m) && /6|short|weak/i.test(m) ? 'A senha precisa ter pelo menos 6 caracteres.'
-    : /valid email|invalid.*email/i.test(m) ? 'E-mail inválido.' : m
-  const redirect = window.location.origin + window.location.pathname
-  const auth = async (up:boolean) => { setMsg(''); if (!email.trim() || !pw) { setMsg('Preencha e-mail e senha.'); return }
-    const r = up ? await supabase.auth.signUp({ email:email.trim(), password:pw, options:{ emailRedirectTo: redirect } }) : await supabase.auth.signInWithPassword({ email:email.trim(), password:pw })
-    if (r.error) setMsg(traduz(r.error.message))
-    else if (up && !r.data.session) setMsg(r.data.user && r.data.user.identities?.length === 0 ? 'Este e-mail já tem cadastro. Use "Entrar".' : 'Enviamos um e-mail de confirmação. Confira a caixa de entrada e também o spam.') }
-  const create = async () => { const { data, error } = await supabase.from('sheets').insert({ data: emptySheet() }).select().single(); if (error) setMsg(error.message); else setOpen({ rec:data as Rec, mode:'owner' }) }
-  const remove = async (id:string) => { if (ok('Excluir esta ficha definitivamente?')) { await supabase.from('sheets').delete().eq('id',id); load() } }
-  if (!ready) return <div className="wrap">Carregando…</div>
-  if (!user) return <div className="wrap"><div className="panel" style={{maxWidth:360,margin:'40px auto'}}><h2>Ficha de RPG</h2>
-    <div className="row"><input style={{width:'100%'}} placeholder="E-mail" value={email} onChange={e=>setEmail(e.target.value)}/></div>
-    <div className="row"><input style={{width:'100%'}} type="password" placeholder="Senha (mín. 6)" value={pw} onChange={e=>setPw(e.target.value)}/></div>
-    <div className="row"><button className="pri" onClick={()=>auth(false)}>Entrar</button><button onClick={()=>auth(true)}>Cadastrar</button></div><p className="lbl">{msg}</p></div></div>
-  if (open) return <Editor key={open.rec.id} rec={open.rec} mode={open.mode} gmItems={gm?items:undefined} onBack={()=>setOpen(null)} onCampaign={c=>{ setCampView(c); setOpen(null) }}/>
-  if (campView) return <CampaignPage userId={user.id} camp={campView} onBack={()=>setCampView(null)} onOpen={(rec,mode)=>setOpen({ rec, mode })}/>
-
-  const groups = Object.entries(group.reduce<Record<string,Rec[]>>((a,r)=>{ (a[r.campaign_id!] ??= []).push(r); return a }, {}))
-  return <div className="wrap"><div className="row"><button className={view==='mine'?'pri':''} onClick={()=>setView('mine')}>Minhas fichas</button>
-    {gm && <button className={view==='gm'?'pri':''} onClick={()=>setView('gm')}>Área do mestre</button>}<button onClick={()=>supabase.auth.signOut()}>Sair</button></div>
-    {view==='gm' && gm
-      ? <GmArea userId={user.id} items={items} reloadItems={loadItems} onOpen={(rec,mode)=>setOpen({ rec, mode })} nav={gmNav} setNav={setGmNav}/>
-      : <>
-        <button className="pri" onClick={create}>+ Nova ficha</button><p className="lbl">{msg}</p>
-        {list.map(r=>{ const d = nm(r); return <div className="panel card" key={r.id}><Avatar src={d.foto} name={d.nome} size={52}/>
-          <div style={{flex:1,minWidth:140}}><b>{d.nome||'(sem nome)'}</b><div className="lbl">{d.classe||'—'} · nível {d.nivel}</div></div>
-          {r.campaign_id && <span className="cpill ok">🏰 {campNames[r.campaign_id] ?? 'Campanha'}</span>}
-          <button onClick={()=>setOpen({ rec:r, mode:'owner' })}>Abrir</button><button className="del" onClick={()=>remove(r.id)}>Excluir</button></div> })}
-        {!list.length && <p className="lbl">Nenhuma ficha ainda.</p>}
-        {groups.map(([cid, rs])=><div key={cid}><h2 style={{marginTop:22}}>Grupo — {campNames[cid] ?? 'Campanha'}</h2>
-          {rs.map(r=>{ const d = nm(r); return <div className="panel card" key={r.id}><Avatar src={d.foto} name={d.nome} size={52}/>
-            <div style={{flex:1,minWidth:140}}><b>{d.nome||'(sem nome)'}</b><div className="lbl">{d.classe||'—'} · nível {d.nivel} · somente leitura</div></div>
-            <button onClick={()=>setOpen({ rec:r, mode:'ro' })}>Ver</button></div> })}</div>)}</>}</div>
+// Página da campanha (visão do jogador): fichas do grupo. O banco só entrega as que o dono liberou.
+export function CampaignPage({ userId, camp, onBack, onOpen }: { userId:string; camp:{ id:string; nome:string }; onBack:()=>void; onOpen:(r:Rec,m:Mode)=>void }) {
+  const [sheets, setSheets] = useState<Rec[]>([]); const [msg, setMsg] = useState(''); const [loading, setLoading] = useState(true)
+  useEffect(() => { supabase.from('sheets').select('*').eq('campaign_id',camp.id).eq('kind','player').order('updated_at',{ascending:false})
+    .then(({ data, error }: any) => { setLoading(false); if (error) setMsg(error.message); else setSheets(data as Rec[]) }) }, [camp.id])
+  const mine = sheets.filter(r=>r.owner_id===userId), others = sheets.filter(r=>r.owner_id!==userId)
+  const card = (r:Rec, own:boolean) => { const d = normalize({ ...emptySheet(), ...r.data }), m = derive(d)
+    return <div className="panel card" key={r.id}><Avatar src={d.foto} name={d.nome} size={56}/>
+      <div style={{flex:1,minWidth:140}}><b>{d.nome||'(sem nome)'}</b>{own&&<span className="lbl"> (você)</span>}
+        <div className="lbl">{d.classe||'—'} · {d.raca||'Humano'} · nível {d.nivel} · PV {d.pv}/{m.pvMax}</div></div>
+      <button onClick={()=>onOpen(r, own?'owner':'ro')}>{own?'Abrir':'Ver'}</button></div> }
+  return <div className="wrap"><div className="topbar"><button onClick={onBack}>← Voltar</button><h3 style={{margin:0}}>🏰 {camp.nome}</h3></div>
+    {msg && <p className="neg">{msg}</p>}
+    <h2>Minhas fichas na campanha</h2>{mine.map(r=>card(r,true))}{!mine.length&&!loading&&<p className="lbl">Nenhuma ficha sua está nesta campanha.</p>}
+    <h2 style={{marginTop:22}}>Jogadores do grupo</h2>{others.map(r=>card(r,false))}
+    {!others.length&&!loading&&<p className="lbl">Nenhum jogador liberou a ficha ainda. Cada um libera em ⚙ Configurações da própria ficha.</p>}
+    <p className="lbl" style={{marginTop:16}}>Você vê só as fichas que os donos liberaram, e somente para leitura.</p></div>
 }
