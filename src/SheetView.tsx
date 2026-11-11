@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ATTRS, ATTR_NAMES, COINS, RANKS, CONDITIONS, CATALOG, XP_THRESHOLDS, derive, normalize, clamp, levelInfo, pontos, skillBonus, skillDice, skillLabel, diceCount, attackInfo, weaponAttr, weaponSkillId, rollDice, parseDice, type Sheet, type Row, type Equip, type Attr } from './rules'
+import { ATTRS, ATTR_NAMES, COINS, RANKS, CONDITIONS, CATALOG, XP_THRESHOLDS, derive, normalize, clamp, levelInfo, pontos, skillBonus, skillDice, skillLabel, diceCount, attackInfo, weaponAttr, weaponSkillId, isBroken, rollDice, parseDice, type Sheet, type Row, type Equip, type Attr } from './rules'
 
 import { uid, fileToAvatar, Avatar } from './ui'
 import type { GmItem } from './db'
@@ -58,6 +58,8 @@ export function SheetView({ s, setS, ro=false, gmItems }: { s:Sheet; setS:(f:(s:
   const rollExpr = () => { const dd = parseDice(expr); dd ? roll(expr.trim(), Math.min(dd.n,50), dd.f, dd.mod) : say('Use o formato 2d6+3') }
   const upP = (i:number, p:Partial<Row>) => P({ pericias:s.pericias.map((x,j)=>j===i?{...x,...p}:x) })
   const upE = (i:number, p:Partial<Equip>) => P({ equip:s.equip.map((x,j)=>j===i?{...x,...p}:x) })
+  // Muda a durabilidade máxima: se o item estava cheio (ou é novo, 0/0), continua cheio; nunca fica acima do novo máximo.
+  const setDurMax = (i:number, n:number) => P({ equip:s.equip.map((x,j)=>j!==i?x:{ ...x, durMax:n, dur: x.dur>=x.durMax || x.dur>n ? n : x.dur }) })
   const setAttr = (a:Attr, n:number) => P({ attrs:{...s.attrs,[a]:clamp(n,5,s.attrs[a]+Math.max(0,pt.restantes))} })
   const ini = s.pericias.find(p=>p.nome==='Iniciativa')
   const addCond = (nome:string) => { const c = CONDITIONS.find(x=>x.nome===nome)!; P({ conds:[...s.conds,{ id:uid(), nome, dur:c.dur??0 }] }) }
@@ -68,6 +70,7 @@ export function SheetView({ s, setS, ro=false, gmItems }: { s:Sheet; setS:(f:(s:
     P({ equip:[...s.equip,{ id:uid(), nome:c[0], tipo:c[1], espacos:c[2], dur:c[3], durMax:c[3], dano:c[4], bloqueio:c[5]??0, mana:c[6]??0, equipado:false }] }) }
   const addGm = (id:string) => { const g = gmItems?.find(x=>x.id===id)?.data; if (!g) return
     if (g.cat==='equip') P({ equip:[...s.equip,{ id:uid(), nome:g.nome, tipo:g.tipo??'', espacos:g.espacos??0, dur:g.dur??0, durMax:g.durMax??g.dur??0, dano:g.dano??'', bloqueio:g.bloqueio??0, mana:g.mana??0, equipado:false, ...(g.atq?{atq:g.atq}:{}), ...(g.bonus?{bonus:g.bonus}:{}) }] })
+    else if (g.cat==='hab') P({ habs:[...s.habs,{ id:uid(), nome:g.nome, custo:g.custo??'', desc:g.desc??'' }] })
     else P({ inv:[...s.inv,{ id:uid(), nome:g.nome, qtd:g.qtd??1, desc:g.desc??'' }] }) }
   const base = XP_THRESHOLDS[lv.nivel-1], pct = lv.proximo===null ? 100 : 100*(s.xp-base)/(lv.proximo-base)
   const equipped = s.equip.filter(e=>e.equipado)
@@ -121,7 +124,7 @@ export function SheetView({ s, setS, ro=false, gmItems }: { s:Sheet; setS:(f:(s:
         {tab==='Combate' && <section className="panel">
           <div className="row"><input style={{flex:1}} value={expr} onChange={e=>setExpr(e.target.value)} onKeyDown={e=>e.key==='Enter'&&rollExpr()} placeholder="Rolar dados (ex.: 2d6+3)"/><button className="pri" onClick={rollExpr}>🎲</button></div>
           <h2 style={{marginTop:14}}>Ataques</h2>
-          {equipped.length>0 ? equipped.map(e=>{ const dd=parseDice(e.dano), a=attackInfo(s,e); return <div className="wp" key={e.id}><div style={{flex:1}}><b>{e.nome}{e.dur<=0&&' (quebrado)'}</b><div className="lbl">{e.dano} · {a.n}d20+{a.mod+a.pericia+a.acess} · dano +{a.val} ({a.attr})</div></div>{dd&&<button className="pri" title="Ataque + dano" onClick={()=>attack(e)}>🎲</button>}</div>}) : <p className="lbl">Equipe uma arma na aba Inventário.</p>}
+          {equipped.length>0 ? equipped.map(e=>{ const dd=parseDice(e.dano), a=attackInfo(s,e); return <div className="wp" key={e.id}><div style={{flex:1}}><b>{e.nome}{isBroken(e)&&' (quebrado)'}</b><div className="lbl">{e.dano} · {a.n}d20+{a.mod+a.pericia+a.acess} · dano +{a.val} ({a.attr})</div></div>{dd&&<button className="pri" title="Ataque + dano" onClick={()=>attack(e)}>🎲</button>}</div>}) : <p className="lbl">Equipe uma arma na aba Inventário.</p>}
           <div className="row" style={{marginTop:8}}>{ini&&<button onClick={rollIni}>🎲 Iniciativa</button>}<button onClick={passTurn} disabled={!s.conds.length}>⏭ Passar turno</button></div>
           <h2 style={{marginTop:14}}>Condições</h2>
           <div className="chips">{CONDITIONS.map(c=><button key={c.nome} title={c.efeito} onClick={()=>addCond(c.nome)}>+ {c.nome}</button>)}</div>
@@ -130,24 +133,25 @@ export function SheetView({ s, setS, ro=false, gmItems }: { s:Sheet; setS:(f:(s:
 
         {tab==='Perícias' && <div className="only-m">{skills}</div>}
 
-        {tab==='Habilidades' && <section className="panel"><Table cols={[{k:'nome',label:'Nome'},{k:'custo',label:'Custo'},{k:'desc',label:'Efeito'}]} rows={s.habs} onChange={r=>P({habs:r})} onAdd={()=>P({habs:[...s.habs,{id:uid(),nome:'',custo:'',desc:''}]})}/></section>}
+        {tab==='Habilidades' && <section className="panel"><Table cols={[{k:'nome',label:'Nome'},{k:'custo',label:'Custo'},{k:'desc',label:'Efeito'}]} rows={s.habs} onChange={r=>P({habs:r})} onAdd={()=>P({habs:[...s.habs,{id:uid(),nome:'',custo:'',desc:''}]})}/>
+          {!!gmItems?.some(g=>g.data.cat==='hab')&&!ro&&<div className="row" style={{marginTop:8}}><select value="" onChange={e=>e.target.value&&addGm(e.target.value)} title="Só o mestre enxerga estas habilidades"><option value="">+ Habilidade do mestre…</option>{gmItems.filter(g=>g.data.cat==='hab').map(g=><option key={g.id} value={g.id}>{g.data.nome}</option>)}</select></div>}</section>}
 
         {tab==='Inventário' && <>
           <section className="panel"><h2>Equipamentos</h2>
-            {s.equip.map((e,i)=>{ const dd=parseDice(e.dano), op=openEq===e.id; return <div className="eq" key={e.id} style={e.dur<=0?{opacity:.55}:undefined}>
+            {s.equip.map((e,i)=>{ const dd=parseDice(e.dano), op=openEq===e.id; return <div className="eq" key={e.id} style={isBroken(e)?{opacity:.55}:undefined}>
               <div className="row"><input type="checkbox" className="ck" checked={e.equipado} onChange={ev=>upE(i,{equipado:ev.target.checked})} title="Equipado"/>
-                <div style={{flex:1,minWidth:120}}><b>{e.nome||'(sem nome)'}</b><div className="lbl">{e.dano} · {e.dur}/{e.durMax}</div></div>
+                <div style={{flex:1,minWidth:120}}><b>{e.nome||'(sem nome)'}</b><div className="lbl">{e.dano} · {e.durMax>0?`${e.dur}/${e.durMax}`:'sem durabilidade'}</div></div>
                 {dd&&<button title="Ataque + dano" onClick={()=>attack(e)}>🎲</button>}<button onClick={()=>setOpenEq(op?null:e.id)}>{op?'▲':'✎'}</button></div>
-              {op&&<div className="row" style={{marginTop:8}}><F l="Nome"><input value={e.nome} onChange={ev=>upE(i,{nome:ev.target.value})}/></F><F l="Tipo"><input value={e.tipo} onChange={ev=>upE(i,{tipo:ev.target.value})}/></F>
+              {op&&<div className="eqf"><F l="Nome"><input value={e.nome} onChange={ev=>upE(i,{nome:ev.target.value})}/></F><F l="Tipo"><input value={e.tipo} onChange={ev=>upE(i,{tipo:ev.target.value})}/></F>
                 <F l="Dano / Efeito"><input value={e.dano} onChange={ev=>upE(i,{dano:ev.target.value})}/></F>
-                <F l={`Durabilidade (máx ${e.durMax})`}><Num v={e.dur} max={e.durMax} set={n=>upE(i,{dur:n})}/></F><F l="Espaços"><Num v={e.espacos} set={n=>upE(i,{espacos:n})}/></F>
+                <F l="Durabilidade atual"><Num v={e.dur} max={e.durMax} set={n=>upE(i,{dur:n})}/></F><F l="Durabilidade máx. (0 = sem durabilidade)"><Num v={e.durMax} set={n=>setDurMax(i,n)}/></F><F l="Espaços"><Num v={e.espacos} set={n=>upE(i,{espacos:n})}/></F>
                 <F l="Atributo (ataque/dano)"><select value={weaponAttr(e)} onChange={ev=>upE(i,{atq:ev.target.value as 'FOR'|'AGI'})}><option>FOR</option><option>AGI</option></select></F>
                 <F l="Perícia do ataque"><select value={weaponSkillId(e)} onChange={ev=>upE(i,{pericia:ev.target.value})}><option value="">—</option>{s.pericias.map(p=><option key={p.id} value={p.id}>{p.nome||'(sem nome)'}</option>)}</select></F>
                 <F l="Bônus (acessório)"><Num v={e.bonus??0} min={-99} set={n=>upE(i,{bonus:n})}/></F>
                 <F l="Bloqueio"><Num v={e.bloqueio} set={n=>upE(i,{bloqueio:n})}/></F><F l="Mana máx."><Num v={e.mana} set={n=>upE(i,{mana:n})}/></F>
-                <button className="del" onClick={()=>ok('Remover item?')&&P({equip:s.equip.filter((_,j)=>j!==i)})}>🗑 Remover</button></div>}</div>})}
+                <button className="del eqrm" onClick={()=>ok('Remover item?')&&P({equip:s.equip.filter((_,j)=>j!==i)})}>🗑 Remover</button></div>}</div>})}
             <div className="row"><select value="" onChange={e=>e.target.value!==''&&addCatalog(+e.target.value)}><option value="">+ Item do livro…</option>{CATALOG.map((c,i)=><option key={c[0]} value={i}>{c[0]}</option>)}</select>
-              {!!gmItems?.length&&!ro&&<select value="" onChange={e=>e.target.value&&addGm(e.target.value)} title="Só o mestre enxerga estes itens"><option value="">+ Item do mestre…</option>{gmItems.map(g=><option key={g.id} value={g.id}>{g.data.nome} ({g.data.cat==='equip'?'equip.':'item'})</option>)}</select>}
+              {!!gmItems?.some(g=>g.data.cat!=='hab')&&!ro&&<select value="" onChange={e=>e.target.value&&addGm(e.target.value)} title="Só o mestre enxerga estes itens"><option value="">+ Item do mestre…</option>{gmItems.filter(g=>g.data.cat!=='hab').map(g=><option key={g.id} value={g.id}>{g.data.nome} ({g.data.cat==='equip'?'equip.':'item'})</option>)}</select>}
               <button onClick={()=>{const id=uid();P({equip:[...s.equip,{id,nome:'',tipo:'',espacos:0,dur:0,durMax:0,dano:'',bloqueio:0,mana:0,equipado:false}]});setOpenEq(id)}}>+ Personalizado</button></div></section>
           <section className="panel"><h2>Itens</h2><Table cols={[{k:'nome',label:'Item'},{k:'qtd',label:'Qtd',t:'num'},{k:'desc',label:'Descrição'}]} rows={s.inv} onChange={r=>P({inv:r})} onAdd={()=>P({inv:[...s.inv,{id:uid(),nome:'',qtd:1,desc:''}]})}/></section>
           <section className="panel"><h2>Moedas</h2><div className="coins">{COINS.map((c,i)=><div className="coin" key={c}><span><i style={{background:COIN_COLORS[i]}}/>{c}</span><Num v={s.moedas[c]??0} set={n=>P({moedas:{...s.moedas,[c]:n}})}/></div>)}</div>
