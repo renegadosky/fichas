@@ -16,7 +16,7 @@ function SheetCard({ r, onOpen, children }: { r:Rec; onOpen:()=>void; children?:
 }
 
 function ItemForm({ item, onSaved, onCancel }: { item:GmItem|null; onSaved:()=>void; onCancel:()=>void }) {
-  const [d, setD] = useState<GmItemData>(item?.data ?? { cat:'equip', nome:'', tipo:'', espacos:1, dur:20, durMax:20, dano:'', bloqueio:0, mana:0, bonus:0, qtd:1, desc:'' })
+  const [d, setD] = useState<GmItemData>(item?.data ?? { cat:'equip', nome:'', tipo:'', espacos:1, dur:20, durMax:20, dano:'', bloqueio:0, mana:0, bonus:0, qtd:1, desc:'', custo:'' })
   const [err, setErr] = useState('')
   const up = (p:Partial<GmItemData>) => setD(x=>({ ...x, ...p }))
   const n = (k:keyof GmItemData) => <input type="number" value={(d[k] as number)??0} onChange={e=>up({[k]:+e.target.value} as any)}/>
@@ -25,7 +25,7 @@ function ItemForm({ item, onSaved, onCancel }: { item:GmItem|null; onSaved:()=>v
     const { error } = item ? await supabase.from('gm_items').update({ data }).eq('id',item.id) : await supabase.from('gm_items').insert({ data })
     if (error) setErr(error.message); else onSaved() }
   return <div className="panel"><h2>{item?'Editar item':'Novo item do mestre'}</h2><div className="row">
-    <label className="f"><span className="lbl">Categoria</span><select value={d.cat} onChange={e=>up({cat:e.target.value as any})}><option value="equip">Arma / armadura</option><option value="item">Item comum</option></select></label>
+    <label className="f"><span className="lbl">Categoria</span><select value={d.cat} onChange={e=>up({cat:e.target.value as any})}><option value="equip">Arma / armadura</option><option value="item">Item comum</option><option value="hab">Habilidade</option></select></label>
     <label className="f"><span className="lbl">Nome</span><input value={d.nome} onChange={e=>up({nome:e.target.value})}/></label>
     {d.cat==='equip' ? <>
       <label className="f"><span className="lbl">Tipo</span><input value={d.tipo??''} onChange={e=>up({tipo:e.target.value})} placeholder="Corte, Perfuração (Distância)…"/></label>
@@ -35,16 +35,23 @@ function ItemForm({ item, onSaved, onCancel }: { item:GmItem|null; onSaved:()=>v
       <label className="f"><span className="lbl">Durabilidade</span>{n('dur')}</label>
       <label className="f"><span className="lbl">Espaços</span>{n('espacos')}</label>
       <label className="f"><span className="lbl">Bloqueio</span>{n('bloqueio')}</label>
-      <label className="f"><span className="lbl">Mana máx.</span>{n('mana')}</label></> : <>
+      <label className="f"><span className="lbl">Mana máx.</span>{n('mana')}</label></> : d.cat==='hab' ? <>
+      <label className="f"><span className="lbl">Custo</span><input value={d.custo??''} onChange={e=>up({custo:e.target.value})} placeholder="10 de mana"/></label>
+      <label className="f" style={{flexBasis:'100%'}}><span className="lbl">Efeito</span><input value={d.desc??''} onChange={e=>up({desc:e.target.value})}/></label></> : <>
       <label className="f"><span className="lbl">Quantidade</span>{n('qtd')}</label>
       <label className="f" style={{flexBasis:'100%'}}><span className="lbl">Descrição</span><input value={d.desc??''} onChange={e=>up({desc:e.target.value})}/></label></>}</div>
     {err && <p className="neg">{err}</p>}<div className="row"><button className="pri" onClick={save}>Salvar</button><button onClick={onCancel}>Cancelar</button></div></div>
 }
 
-export function GmArea({ userId, items, reloadItems, onOpen }: { userId:string; items:GmItem[]; reloadItems:()=>void; onOpen:(r:Rec,m:Mode)=>void }) {
-  const [sub, setSub] = useState<'camp'|'itens'>('camp')
-  const [camps, setCamps] = useState<Campaign[]>([]); const [cur, setCur] = useState<Campaign|null>(null)
-  const [tab, setTab] = useState<Kind>('player'); const [sheets, setSheets] = useState<Rec[]>([])
+export type GmNav = { sub:'camp'|'itens'; cur:Campaign|null; tab:Kind }
+export const GM_NAV0: GmNav = { sub:'camp', cur:null, tab:'player' }
+// A posição (campanha aberta + aba) fica no App: ao abrir uma ficha esta tela some, e ao voltar precisa reabrir no mesmo lugar.
+export function GmArea({ userId, items, reloadItems, onOpen, nav, setNav }: { userId:string; items:GmItem[]; reloadItems:()=>void; onOpen:(r:Rec,m:Mode)=>void; nav:GmNav; setNav:(f:(n:GmNav)=>GmNav)=>void }) {
+  const { sub, cur, tab } = nav
+  const setSub = (sub:GmNav['sub']) => setNav(n=>({ ...n, sub }))
+  const setCur = (cur:Campaign|null) => setNav(n=>({ ...n, cur }))
+  const setTab = (tab:Kind) => setNav(n=>({ ...n, tab }))
+  const [camps, setCamps] = useState<Campaign[]>([]); const [sheets, setSheets] = useState<Rec[]>([])
   const [msg, setMsg] = useState(''); const [form, setForm] = useState<GmItem|'novo'|null>(null); const [nome, setNome] = useState(''); const [creating, setCreating] = useState(false)
 
   const loadCamps = async () => { const { data, error } = await supabase.from('campaigns').select('*').eq('owner_id',userId).order('created_at'); if (error) setMsg(error.message); else setCamps(data as Campaign[]) }
@@ -65,11 +72,11 @@ export function GmArea({ userId, items, reloadItems, onOpen }: { userId:string; 
   const delItem = async (g:GmItem) => { if (!confirm(`Excluir "${g.data.nome}"? (fichas que já receberam o item continuam com ele)`)) return; await supabase.from('gm_items').delete().eq('id',g.id); reloadItems() }
 
   const head = <div className="row"><button className={sub==='camp'?'pri':''} onClick={()=>{ setSub('camp'); setCur(null) }}>Campanhas</button>
-    <button className={sub==='itens'?'pri':''} onClick={()=>setSub('itens')}>Itens e armas do mestre</button></div>
+    <button className={sub==='itens'?'pri':''} onClick={()=>setSub('itens')}>Itens, armas e habilidades do mestre</button></div>
 
-  if (sub==='itens') return <div>{head}<p className="lbl">Só você vê estes itens. Eles aparecem no Inventário das fichas que você abrir, no menu “+ Item do mestre”.</p>
+  if (sub==='itens') return <div>{head}<p className="lbl">Só você vê estes itens. Armas e itens aparecem no Inventário das fichas que você abrir (“+ Item do mestre”); habilidades aparecem na aba Habilidades (“+ Habilidade do mestre”).</p>
     {form ? <ItemForm item={form==='novo'?null:form} onSaved={()=>{ setForm(null); reloadItems() }} onCancel={()=>setForm(null)}/> : <button className="pri" onClick={()=>setForm('novo')}>+ Novo item</button>}
-    {items.map(g=><div className="panel card" key={g.id}><div style={{flex:1}}><b>{g.data.nome}</b><div className="lbl">{g.data.cat==='equip'?`${g.data.tipo||'Equipamento'} · ${g.data.dano||'—'}`:`Item · qtd ${g.data.qtd??1}`}</div></div>
+    {items.map(g=><div className="panel card" key={g.id}><div style={{flex:1}}><b>{g.data.nome}</b><div className="lbl">{g.data.cat==='equip'?`${g.data.tipo||'Equipamento'} · ${g.data.dano||'—'}`:g.data.cat==='hab'?`Habilidade${g.data.custo?` · ${g.data.custo}`:''}`:`Item · qtd ${g.data.qtd??1}`}</div></div>
       <button onClick={()=>setForm(g)}>Editar</button><button className="del" onClick={()=>delItem(g)}>Excluir</button></div>)}
     {!items.length && !form && <p className="lbl">Nenhum item criado ainda.</p>}</div>
 
