@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from './supabase'
 import { emptySheet, normalize } from './rules'
 import { Editor } from './Editor'
-import { GmArea } from './GmArea'
+import { GmArea, GM_NAV0, type GmNav } from './GmArea'
 import { CampaignPage } from './CampaignPage'
 import { Avatar } from './ui'
 import type { Rec, Mode, GmItem } from './db'
@@ -14,7 +14,7 @@ export default function App() {
   const [user, setUser] = useState<any>(null); const [ready, setReady] = useState(false); const [gm, setGm] = useState(false)
   const [list, setList] = useState<Rec[]>([]); const [group, setGroup] = useState<Rec[]>([]); const [campNames, setCampNames] = useState<Record<string,string>>({})
   const [open, setOpen] = useState<{ rec:Rec; mode:Mode }|null>(null); const [view, setView] = useState<'mine'|'gm'>('mine')
-  const [items, setItems] = useState<GmItem[]>([]); const [campView, setCampView] = useState<{ id:string; nome:string }|null>(null)
+  const [items, setItems] = useState<GmItem[]>([]); const [gmNav, setGmNav] = useState<GmNav>(GM_NAV0); const [campView, setCampView] = useState<{ id:string; nome:string }|null>(null)
   const [email, setEmail] = useState(''); const [pw, setPw] = useState(''); const [msg, setMsg] = useState('')
   useEffect(() => { supabase.auth.getSession().then(({data})=>{ setUser(data.session?.user??null); setReady(true) })
     const { data:sub } = supabase.auth.onAuthStateChange((_e,s)=>setUser(s?.user??null)); return () => sub.subscription.unsubscribe() }, [])
@@ -61,7 +61,7 @@ export default function App() {
   return <div className="wrap"><div className="row"><button className={view==='mine'?'pri':''} onClick={()=>setView('mine')}>Minhas fichas</button>
     {gm && <button className={view==='gm'?'pri':''} onClick={()=>setView('gm')}>Área do mestre</button>}<button onClick={()=>supabase.auth.signOut()}>Sair</button></div>
     {view==='gm' && gm
-      ? <GmArea userId={user.id} items={items} reloadItems={loadItems} onOpen={(rec,mode)=>setOpen({ rec, mode })}/>
+      ? <GmArea userId={user.id} items={items} reloadItems={loadItems} onOpen={(rec,mode)=>setOpen({ rec, mode })} nav={gmNav} setNav={setGmNav}/>
       : <>
         <button className="pri" onClick={create}>+ Nova ficha</button><p className="lbl">{msg}</p>
         {list.map(r=>{ const d = nm(r); return <div className="panel card" key={r.id}><Avatar src={d.foto} name={d.nome} size={52}/>
