@@ -80,10 +80,14 @@ export function levelInfo(xp:number) {
   return { nivel, proximo, faltam: proximo===null ? 0 : proximo-xp }
 }
 export const pontos = (s:Sheet) => { const total = POINTS_PER_LEVEL*s.nivel; const gastos = ATTRS.reduce((t,a)=>t+s.attrs[a]-ATTR_BASE,0); return { total, gastos, restantes: total-gastos } }
-// Perícias presentes no livro (únicas citadas); a lista completa ainda será fornecida.
+// Perícias fixas: aparecem em toda ficha, não podem ser renomeadas nem removidas (o atributo e o bônus continuam editáveis).
+const SK = (id:string, nome:string, attr:string):Row => ({ id:'base-'+id, nome, attr, base:true })
 export const BASE_SKILLS: Row[] = [
-  { id:'base-reflexo', nome:'Reflexo', attr:'AGI', base:true }, { id:'base-iniciativa', nome:'Iniciativa', attr:'AGI', base:true },
-  { id:'base-botanica', nome:'Botânica', attr:'MEN', base:true }, { id:'base-pontaria', nome:'Pontaria', attr:'', base:true }, { id:'base-vontade', nome:'Vontade', attr:'', base:true } ]
+  SK('reflexo','Reflexo','AGI'), SK('iniciativa','Iniciativa','AGI'), SK('botanica','Botânica','MEN'), SK('pontaria','Pontaria',''), SK('vontade','Vontade',''),
+  SK('acrobacia','Acrobacia','AGI'), SK('atletismo','Atletismo','FOR'), SK('crime','Crime','AGI'), SK('enganacao','Enganação','CAR'),
+  SK('furtividade','Furtividade','AGI'), SK('intimidacao','Intimidação','CAR'), SK('intuicao','Intuição','CAR'), SK('investigacao','Investigação','MEN'),
+  SK('luta','Luta','FOR'), SK('medicina','Medicina','MEN'), SK('percepcao','Percepção','MEN'), SK('persuasao','Persuasão','CAR'),
+  SK('pilotagem','Pilotagem','AGI'), SK('vigor','Vigor','VIT') ]
 // Quantidade de d20 pelo valor do atributo: 1-9 = 1d20, 10-19 = 2d20, 20-29 = 3d20 ...
 export const diceCount = (v:number) => Math.floor(Math.max(0, v)/10) + 1
 // Perícia: o atributo define QUANTOS dados; o valor somado é só o bônus da perícia.
@@ -107,7 +111,9 @@ export const emptySheet = (): Sheet => ({
   moedas:Object.fromEntries(COINS.map(c=>[c,0])), pedras:Object.fromEntries(RANKS.map(r=>[r,0])), historico:'', notas:'' })
 
 const active = (s:Sheet) => s.conds.map(c => CONDITIONS.find(x=>x.nome===c.nome)).filter(Boolean) as typeof CONDITIONS
-const worn = (s:Sheet) => s.equip.filter(e => e.equipado && e.dur > 0)
+// Item com durabilidade máxima 0 não tem durabilidade (nunca quebra). Só quebra quem tem máximo > 0 e chegou a 0.
+export const isBroken = (e:Equip) => e.durMax > 0 && e.dur <= 0
+const worn = (s:Sheet) => s.equip.filter(e => e.equipado && !isBroken(e))
 export function derive(s:Sheet) {
   const mod = (k:'esq'|'FOR') => active(s).reduce((t,c)=>t+(c[k]??0),0)
   const FOR = s.attrs.FOR + mod('FOR')
@@ -123,12 +129,25 @@ export function derive(s:Sheet) {
   }
 }
 export const clamp = (v:number, min:number, max:number) => Math.max(min, Math.min(max, Math.trunc(Number.isFinite(v)?v:min)))
+const key = (x:string) => (x||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().toLowerCase()
+// Garante as perícias fixas SEM perder nada: se a ficha já tem uma perícia criada à mão com o mesmo nome (ex.: "Luta"),
+// ela vira a fixa mantendo id, atributo e bônus (armas que usam essa perícia continuam funcionando). As demais ficam como estão.
+export function mergeSkills(list:Row[]): Row[] {
+  const rows = list.map(r=>({...r})); const used = new Set<number>()
+  const fixed = BASE_SKILLS.map(b => {
+    let i = rows.findIndex((r,j)=>!used.has(j) && r.id===b.id)
+    if (i<0) i = rows.findIndex((r,j)=>!used.has(j) && key(r.nome)===key(b.nome))
+    if (i<0) return { ...b, bonus:0 }
+    used.add(i); const r = rows[i]
+    return { ...r, nome:b.nome, base:true, attr: r.attr || b.attr, bonus: r.bonus ?? 0 }
+  })
+  return [...fixed, ...rows.filter((_,j)=>!used.has(j))]
+}
 // Nível vem do XP; máximos recalculados sem restaurar os valores atuais.
 export function normalize(s:Sheet): Sheet {
   const xp = Math.max(0, Math.trunc(s.xp||0))
   const attrs = Object.fromEntries(ATTRS.map(a=>[a, Math.max(ATTR_BASE, Math.trunc(s.attrs?.[a]||0))])) as Sheet['attrs']
-  const have = new Set(s.pericias.map(p=>p.id))
-  const pericias = [...BASE_SKILLS.filter(b=>!have.has(b.id)).map(b=>({...b,bonus:0})), ...s.pericias]
+  const pericias = mergeSkills(s.pericias ?? [])
   const n = { ...s, xp, nivel:levelInfo(xp).nivel, attrs, pericias }
   const d = derive(n)
   return { ...n, pv:clamp(n.pv,0,d.pvMax), mana:clamp(n.mana,0,d.manaMax), aura:clamp(n.aura,0,d.auraMax) }
