@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from './supabase'
-import { emptySheet, normalize, derive, type Sheet } from './rules'
+import { emptySheet, normalize, derive, fxText, hasFx, habCost, costText, cleanAttr, type Sheet } from './rules'
+import { FxEditor, AttrFields } from './fx'
 import { Avatar } from './ui'
 import type { Rec, Campaign, GmItem, GmItemData, Kind, Mode } from './db'
 
@@ -11,7 +12,7 @@ const TABS: { k:Kind; label:string; novo:string }[] = [
 function SheetCard({ r, onOpen, children }: { r:Rec; onOpen:()=>void; children?:React.ReactNode }) {
   const d = full(r.data), m = derive(d)
   return <div className="panel card"><Avatar src={d.foto} name={d.nome} size={52}/>
-    <div style={{flex:1,minWidth:140}}><b>{d.nome||'(sem nome)'}</b><div className="lbl">{d.classe||'—'} · nível {d.nivel} · PV {d.pv}/{m.pvMax}</div></div>
+    <div style={{flex:1,minWidth:140}}><b>{d.nome||'(sem nome)'}</b><div className="lbl">{d.jogador?`${d.jogador} · `:''}{d.classe||'—'} · nível {d.nivel} · PV {d.pv}/{m.pvMax}</div></div>
     {children}<button onClick={onOpen}>Abrir</button></div>
 }
 
@@ -21,7 +22,7 @@ function ItemForm({ item, onSaved, onCancel }: { item:GmItem|null; onSaved:()=>v
   const up = (p:Partial<GmItemData>) => setD(x=>({ ...x, ...p }))
   const n = (k:keyof GmItemData) => <input type="number" value={(d[k] as number)??0} onChange={e=>up({[k]:+e.target.value} as any)}/>
   const save = async () => { if (!d.nome.trim()) return setErr('Dê um nome ao item.')
-    const data = d.cat==='equip' ? { ...d, durMax:d.dur } : d
+    const data:GmItemData = d.cat==='equip' ? { ...d, durMax:d.dur, bAttr:cleanAttr(d.bAttr) } : d
     const { error } = item ? await supabase.from('gm_items').update({ data }).eq('id',item.id) : await supabase.from('gm_items').insert({ data })
     if (error) setErr(error.message); else onSaved() }
   return <div className="panel"><h2>{item?'Editar item':'Novo item do mestre'}</h2><div className="row">
@@ -35,11 +36,15 @@ function ItemForm({ item, onSaved, onCancel }: { item:GmItem|null; onSaved:()=>v
       <label className="f"><span className="lbl">Durabilidade</span>{n('dur')}</label>
       <label className="f"><span className="lbl">Espaços</span>{n('espacos')}</label>
       <label className="f"><span className="lbl">Bloqueio</span>{n('bloqueio')}</label>
-      <label className="f"><span className="lbl">Mana máx.</span>{n('mana')}</label></> : d.cat==='hab' ? <>
-      <label className="f"><span className="lbl">Custo</span><input value={d.custo??''} onChange={e=>up({custo:e.target.value})} placeholder="10 de mana"/></label>
-      <label className="f" style={{flexBasis:'100%'}}><span className="lbl">Efeito</span><input value={d.desc??''} onChange={e=>up({desc:e.target.value})}/></label></> : <>
+      <label className="f"><span className="lbl">Mana máx.</span>{n('mana')}</label>
+      <div style={{flexBasis:'100%'}}><span className="lbl">Bônus de atributo (vale enquanto estiver equipado, ex.: luva +3 FOR)</span><AttrFields v={d.bAttr} set={m=>up({bAttr:m})}/></div></> : d.cat==='hab' ? <>
+      <label className="f"><span className="lbl">Custo (texto livre)</span><input value={d.custo??''} onChange={e=>up({custo:e.target.value})} placeholder="10 mana"/></label>
+      <label className="f"><span className="lbl">Gasta Mana</span>{n('cMana')}</label><label className="f"><span className="lbl">Gasta Aura</span>{n('cAura')}</label><label className="f"><span className="lbl">Gasta PV</span>{n('cPv')}</label>
+      <label className="f" style={{flexBasis:'100%'}}><span className="lbl">Efeito (descrição)</span><input value={d.desc??''} onChange={e=>up({desc:e.target.value})}/></label>
+      <div style={{flexBasis:'100%'}}><FxEditor fx={d.fx} set={f=>up({fx:f})} title="Efeito ao usar (opcional): buff, cura, dano por turno…"/></div></> : <>
       <label className="f"><span className="lbl">Quantidade</span>{n('qtd')}</label>
-      <label className="f" style={{flexBasis:'100%'}}><span className="lbl">Descrição</span><input value={d.desc??''} onChange={e=>up({desc:e.target.value})}/></label></>}</div>
+      <label className="f" style={{flexBasis:'100%'}}><span className="lbl">Descrição</span><input value={d.desc??''} onChange={e=>up({desc:e.target.value})}/></label>
+      <div style={{flexBasis:'100%'}}><FxEditor fx={d.fx} set={f=>up({fx:f})} title="Efeito ao usar (poção, comida…): o jogador clica em Usar, gasta 1 unidade e o efeito entra"/></div></>}</div>
     {err && <p className="neg">{err}</p>}<div className="row"><button className="pri" onClick={save}>Salvar</button><button onClick={onCancel}>Cancelar</button></div></div>
 }
 
@@ -76,7 +81,7 @@ export function GmArea({ userId, items, reloadItems, onOpen, nav, setNav }: { us
 
   if (sub==='itens') return <div>{head}<p className="lbl">Só você vê estes itens. Armas e itens aparecem no Inventário das fichas que você abrir (“+ Item do mestre”); habilidades aparecem na aba Habilidades (“+ Habilidade do mestre”).</p>
     {form ? <ItemForm item={form==='novo'?null:form} onSaved={()=>{ setForm(null); reloadItems() }} onCancel={()=>setForm(null)}/> : <button className="pri" onClick={()=>setForm('novo')}>+ Novo item</button>}
-    {items.map(g=><div className="panel card" key={g.id}><div style={{flex:1}}><b>{g.data.nome}</b><div className="lbl">{g.data.cat==='equip'?`${g.data.tipo||'Equipamento'} · ${g.data.dano||'—'}`:g.data.cat==='hab'?`Habilidade${g.data.custo?` · ${g.data.custo}`:''}`:`Item · qtd ${g.data.qtd??1}`}</div></div>
+    {items.map(g=><div className="panel card" key={g.id}><div style={{flex:1}}><b>{g.data.nome}</b><div className="lbl">{g.data.cat==='equip'?`${g.data.tipo||'Equipamento'} · ${g.data.dano||'—'}${cleanAttr(g.data.bAttr)?` · ${fxText({attr:g.data.bAttr})}`:''}`:g.data.cat==='hab'?`Habilidade${costText(habCost({id:'x',custo:g.data.custo,cMana:g.data.cMana,cAura:g.data.cAura,cPv:g.data.cPv}))?` · custo ${costText(habCost({id:'x',custo:g.data.custo,cMana:g.data.cMana,cAura:g.data.cAura,cPv:g.data.cPv}))}`:''}${hasFx(g.data.fx)?` · ${fxText(g.data.fx)}`:''}`:`Item · qtd ${g.data.qtd??1}${hasFx(g.data.fx)?` · ${fxText(g.data.fx)}`:''}`}</div></div>
       <button onClick={()=>setForm(g)}>Editar</button><button className="del" onClick={()=>delItem(g)}>Excluir</button></div>)}
     {!items.length && !form && <p className="lbl">Nenhum item criado ainda.</p>}</div>
 
