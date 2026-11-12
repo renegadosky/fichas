@@ -78,3 +78,15 @@ h3{font-size:18px}
 .eqf .num input{flex:1 1 0;min-width:0;width:auto}
 .eqf .num button{flex:0 0 34px;min-width:34px;width:34px;padding:0}
 .eqf .eqrm{justify-self:start}
+
+/* Efeitos, habilidades usáveis, itens consumíveis */
+.fxe{background:var(--p2);border:1px dashed var(--b);border-radius:10px;padding:10px;margin-top:8px;display:flex;flex-direction:column;gap:6px}
+.fxg{display:grid;grid-template-columns:repeat(auto-fill,minmax(84px,1fr));gap:8px}.fxg .f{min-width:0}.fxg input{width:100%}
+.grow{flex:1 1 140px;min-width:0}.eq .row{margin-bottom:6px}.eq>input{width:100%}.eq .fxe{margin-top:6px}
+.eqf .wide{grid-column:1/-1}.usar{white-space:nowrap}
+.ro .usar{pointer-events:none;opacity:.5}
+
+/* cabeçalho agora tem 6 colunas: foto, personagem, jogador, classe, idade, raça */
+.hdr{grid-template-columns:90px 2fr 1.4fr 1.4fr 80px 130px}
+@media(max-width:820px){.hdr{grid-template-columns:90px 1fr 1fr}}
+.fxg.d1{grid-template-columns:minmax(0,220px)}
