@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { MAX_LEVEL, XP_THRESHOLDS, emptySheet, derive, normalize, levelInfo, pontos, parseDice, skillBonus, skillDice, skillLabel, diceCount, attackInfo, CATALOG, mergeSkills, isBroken, BASE_SKILLS, type Equip } from './rules'
+import { MAX_LEVEL, XP_THRESHOLDS, emptySheet, derive, normalize, levelInfo, pontos, parseDice, skillBonus, skillDice, skillLabel, diceCount, attackInfo, CATALOG, mergeSkills, isBroken, BASE_SKILLS, effAttrs, advanceTurn, consumeItem, castHab, habCost, parseCost, rollDur, fxText, cleanFx, hasFx, type Equip } from './rules'
 const shield = (b:number, dur=5):Equip => ({id:'1',nome:'E',tipo:'',espacos:1,dur,durMax:5,dano:'',bloqueio:b,mana:0,equipado:true})
 const base = () => { const s = emptySheet(); s.attrs = {FOR:0,AGI:0,MEN:0,CAR:0,VIT:0}; return s }
 describe('fórmulas', () => {
@@ -42,4 +42,49 @@ describe('fórmulas', () => {
   it('durabilidade: máx 0 = sem durabilidade (não quebra); máx>0 e atual 0 = quebrado', () => {
     expect(isBroken({...shield(2,0),durMax:0})).toBe(false); expect(isBroken(shield(2,0))).toBe(true); expect(isBroken(shield(2,3))).toBe(false)
     const s=base(); s.equip=[{...shield(2,0),durMax:0}]; expect(derive(s).defesa).toBe(8); s.equip=[shield(2,0)]; expect(derive(s).defesa).toBe(6) })
+  it('equipamento vestido soma atributo e sai ao desequipar ou quebrar', () => {
+    const s=base(); s.attrs.FOR=5; s.equip=[{...shield(0),bAttr:{FOR:3,VIT:2},equipado:true}]
+    expect(effAttrs(s).FOR).toBe(8); expect(derive(s).auraMax).toBe(80); expect(derive(s).pvMax).toBe(15)
+    s.equip[0].equipado=false; expect(effAttrs(s).FOR).toBe(5)
+    s.equip[0].equipado=true; s.equip[0].dur=0; expect(effAttrs(s).FOR).toBe(5) })
+  it('condições: Sangrando tira 2 PV por turno e some no fim; Fraco reduz FOR', () => {
+    const s=base(); s.nivel=1; s.attrs.VIT=10; s.pv=40; s.conds=[{id:'a',nome:'Sangrando',dur:2}]
+    const r1=advanceTurn(s); expect(r1.sheet.pv).toBe(38); expect(r1.sheet.conds[0].dur).toBe(1)
+    const r2=advanceTurn(r1.sheet); expect(r2.sheet.pv).toBe(36); expect(r2.sheet.conds.length).toBe(0); expect(r2.notes.join(' ')).toContain('Sangrando acabou')
+    const f=base(); f.attrs.FOR=5; f.conds=[{id:'f',nome:'Fraco',dur:4}]; expect(effAttrs(f).FOR).toBe(3) })
+  it('Envenenado sem prazo continua; PV não passa de 0', () => {
+    const s=base(); s.attrs.VIT=1; s.pv=1; s.conds=[{id:'e',nome:'Envenenado',dur:0}]
+    const r=advanceTurn(s); expect(r.sheet.pv).toBe(0); expect(r.sheet.conds.length).toBe(1); expect(r.notes.join(' ')).toContain('PV chegou a 0')
+    expect(advanceTurn(r.sheet).sheet.pv).toBe(0) })
+  it('poção de força: some ao beber, dá +FOR pelo prazo e expira', () => {
+    const s=base(); s.attrs.FOR=5; s.inv=[{id:'p',nome:'Poção de Força',qtd:1,fx:{attr:{FOR:4},dur:'2'}}]
+    const r=consumeItem(s,'p'); expect(r.error).toBe(undefined); expect(r.sheet!.inv.length).toBe(0)
+    expect(effAttrs(r.sheet!).FOR).toBe(9); expect(r.sheet!.efeitos![0].dur).toBe(2); expect(s.attrs.FOR).toBe(5)
+    const t1=advanceTurn(r.sheet!).sheet; expect(effAttrs(t1).FOR).toBe(9)
+    const t2=advanceTurn(t1); expect(effAttrs(t2.sheet).FOR).toBe(5); expect(t2.sheet.efeitos!.length).toBe(0) })
+  it('item com várias unidades: gasta 1 por vez; sem unidade não usa', () => {
+    const s=base(); s.attrs.VIT=10; s.pv=10; s.inv=[{id:'c',nome:'Cura',qtd:2,fx:{now:{pv:20}}}]
+    const a=consumeItem(s,'c').sheet!; expect(a.pv).toBe(30); expect(a.inv[0].qtd).toBe(1); expect(a.efeitos!.length).toBe(0)
+    const b=consumeItem(a,'c').sheet!; expect(b.inv.length).toBe(0); expect(consumeItem(b,'c').error).toBeTruthy()
+    const z=base(); z.inv=[{id:'x',nome:'Vazio',qtd:0,fx:{now:{pv:5}}}]; expect(consumeItem(z,'x').error).toBeTruthy() })
+  it('cura imediata respeita o máximo; regeneração por turno funciona', () => {
+    const s=base(); s.attrs.VIT=2; s.pv=9; s.inv=[{id:'r',nome:'Regen',qtd:1,fx:{now:{pv:50},tick:{pv:3},dur:'2'}}]
+    const a=consumeItem(s,'r').sheet!; expect(a.pv).toBe(15); expect(a.efeitos![0].tick).toEqual({pv:3})
+    const b=advanceTurn({...a,pv:4}); expect(b.sheet.pv).toBe(7) })
+  it('duração em dado fica dentro do intervalo', () => { for (let i=0;i<50;i++){ const n=rollDur('1d4').n; expect(n>=1&&n<=4).toBe(true) } expect(rollDur('').n).toBe(0); expect(rollDur('3').n).toBe(3) })
+  it('habilidade gasta mana/aura/PV, confere recursos e pode aplicar efeito', () => {
+    const s=base(); s.attrs.MEN=5; s.attrs.FOR=5; s.attrs.VIT=10; s.mana=30; s.aura=20; s.pv=30
+    s.habs=[{id:'h',nome:'Bala',cMana:10,cAura:5,cPv:4}]
+    const r=castHab(s,'h').sheet!; expect([r.mana,r.aura,r.pv]).toEqual([20,15,26])
+    expect(castHab({...s,mana:5},'h').error).toContain('Mana insuficiente'); expect(castHab({...s,aura:2},'h').error).toContain('Aura insuficiente'); expect(castHab({...s,pv:4},'h').error).toContain('PV insuficiente')
+    s.habs=[{id:'b',nome:'Fúria',cAura:5,fx:{attr:{FOR:2},dur:'3'}}]; const f=castHab(s,'b').sheet!; expect(effAttrs(f).FOR).toBe(7); expect(f.aura).toBe(15) })
+  it('custo antigo escrito em texto continua funcionando', () => {
+    expect(parseCost('10 de mana')).toEqual({mana:10}); expect(parseCost('5 PV + 3 Aura')).toEqual({pv:5,aura:3}); expect(parseCost('mana 7')).toEqual({mana:7}); expect(parseCost('50')).toEqual({})
+    expect(habCost({id:'1',custo:'10 mana'})).toEqual({mana:10}); expect(habCost({id:'1',custo:'10 mana',cMana:3})).toEqual({mana:3}) })
+  it('Sono e Cego tiram 4 de Pontaria; fichas antigas sem efeitos/jogador carregam', () => {
+    const s=emptySheet(); s.conds=[{id:'s',nome:'Sono',dur:0}]; const p=s.pericias.find(x=>x.id==='base-pontaria')!; expect(skillBonus(p,s)).toBe(-4); expect(skillBonus(p)).toBe(0)
+    const old:any={...emptySheet()}; delete old.efeitos; delete old.jogador; const n=normalize(old); expect(n.efeitos).toEqual([]); expect(n.attrs.FOR).toBe(5) })
+  it('texto e limpeza do efeito', () => {
+    expect(fxText({attr:{FOR:3},dur:'1d4',tick:{pv:-2},now:{mana:10}})).toBe('FOR +3 · +10 Mana · −2 PV/turno · por 1d4 turno(s)')
+    expect(cleanFx({attr:{FOR:0},now:{pv:0}})).toBe(undefined); expect(cleanFx({dur:' 3 ',now:{pv:5,mana:0}})).toEqual({dur:'3',now:{pv:5}}); expect(hasFx({dur:'3'})).toBe(false) })
 })
