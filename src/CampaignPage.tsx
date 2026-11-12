@@ -13,7 +13,7 @@ export function CampaignPage({ userId, camp, onBack, onOpen }: { userId:string; 
   const card = (r:Rec, own:boolean) => { const d = normalize({ ...emptySheet(), ...r.data }), m = derive(d)
     return <div className="panel card" key={r.id}><Avatar src={d.foto} name={d.nome} size={56}/>
       <div style={{flex:1,minWidth:140}}><b>{d.nome||'(sem nome)'}</b>{own&&<span className="lbl"> (você)</span>}
-        <div className="lbl">{d.classe||'—'} · {d.raca||'Humano'} · nível {d.nivel} · PV {d.pv}/{m.pvMax}</div></div>
+        <div className="lbl">{d.jogador?`${d.jogador} · `:''}{d.classe||'—'} · {d.raca||'Humano'} · nível {d.nivel} · PV {d.pv}/{m.pvMax}</div></div>
       <button onClick={()=>onOpen(r, own?'owner':'ro')}>{own?'Abrir':'Ver'}</button></div> }
   return <div className="wrap"><div className="topbar"><button onClick={onBack}>← Voltar</button><h3 style={{margin:0}}>🏰 {camp.nome}</h3></div>
     {msg && <p className="neg">{msg}</p>}
