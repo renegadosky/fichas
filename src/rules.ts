@@ -111,6 +111,8 @@ export function attackInfo(s:Sheet, e:Equip) {
   const sk = s.pericias.find(p=>p.id===weaponSkillId(e))
   return { attr, val, n:diceCount(val), mod:Math.floor(val/3), periciaNome:sk?.nome||'', pericia:sk?skillBonus(sk,s):0, acess:e.bonus||0 }
 }
+// Em testes (nd20) NÃO se soma os dados: vale o MAIOR. Os bônus fixos são somados ao maior dado.
+export const bestRoll = (r:number[]) => r.length ? Math.max(...r) : 0
 export const rollDice = (n:number, f:number) => Array.from({length:Math.max(1,n)},()=>1+Math.floor(Math.random()*f))
 export function parseDice(t:string) { const m=/(\d+)d(\d+)\s*([+-]\s*\d+)?/i.exec(t); return m ? { n:+m[1], f:+m[2], mod:m[3]?+m[3].replace(/\s/g,''):0 } : null }
 // Dano da arma: "1d6+2", "2d4"... ou número fixo ("2" = 2 de dano). null = não dá para rolar dano (ex.: armadura "+2 defesa").
