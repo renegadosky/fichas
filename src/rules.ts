@@ -138,8 +138,9 @@ export function effAttrs(s:Sheet): Record<Attr,number> {
 }
 function skillMods(s:Sheet): Record<string,number> { const m:Record<string,number> = {}
   active(s).forEach(c=>{ for (const [k,v] of Object.entries(c.sk ?? {})) m[k] = (m[k] ?? 0) + v }); return m }
-// Defesa base de todo mundo. Era 5 (+ nível); agora 0. Se achar que ficou baixa/alta demais, mude só este número.
-export const DEF_BASE = 0
+// Defesa = DEF_BASE + VIT/DEF_VIT_DIV + bloqueio. Não depende do nível. Para ajustar o equilíbrio, mude só estes dois números.
+export const DEF_BASE = 5
+export const DEF_VIT_DIV = 3
 export function derive(s:Sheet) {
   const e = effAttrs(s)
   const esqMod = active(s).reduce((t,c)=>t+(c.esq ?? 0),0)
@@ -153,7 +154,7 @@ export function derive(s:Sheet) {
     // Esquiva Seca NÃO é teste (sem dados): média de AGI e VIT (valor fixo) + condições.
     esquiva: Math.floor((e.AGI + e.VIT)/2) + esqMod,
     // Defesa (redução fixa de dano): NÃO cresce com o nível. Vem da Vitalidade e dos equipamentos (bloqueio).
-    defesa: DEF_BASE + Math.floor(e.VIT/5) + bloqueio,
+    defesa: DEF_BASE + Math.floor(e.VIT/DEF_VIT_DIV) + bloqueio,
   }
 }
 export const clamp = (v:number, min:number, max:number) => Math.max(min, Math.min(max, Math.trunc(Number.isFinite(v)?v:min)))
