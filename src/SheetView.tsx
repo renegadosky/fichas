@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ATTRS, ATTR_NAMES, COINS, RANKS, CONDITIONS, CATALOG, XP_THRESHOLDS, derive, normalize, clamp, levelInfo, pontos, skillBonus, skillDice, skillLabel, diceCount, attackInfo, weaponAttr, weaponSkillId, isBroken, rollDice, parseDice, parseDamage, advanceTurn, consumeItem, castHab, hasFx, fxText, habCost, costText, cleanAttr, type Sheet, type Row, type Equip, type Attr } from './rules'
+import { ATTRS, ATTR_NAMES, COINS, RANKS, CONDITIONS, CATALOG, XP_THRESHOLDS, derive, normalize, clamp, levelInfo, pontos, skillBonus, skillDice, skillLabel, diceCount, attackInfo, weaponAttr, weaponSkillId, isBroken, bestRoll, rollDice, parseDice, parseDamage, advanceTurn, consumeItem, castHab, hasFx, fxText, habCost, costText, cleanAttr, type Sheet, type Row, type Equip, type Attr } from './rules'
 
 import { uid, fileToAvatar, Avatar } from './ui'
 import { FxEditor, AttrFields } from './fx'
@@ -33,10 +33,10 @@ export function SheetView({ s, setS, ro=false, gmItems }: { s:Sheet; setS:(f:(s:
   const say = (t:string) => setLog(l=>[t,...l].slice(0,20))
   const sum = (r:number[]) => r.reduce((a,b)=>a+b,0)
   const sgn = (v:number) => v>0 ? '+' : '−'
-  // Teste: nd20 (n vem do atributo) + partes fixas. Ex.: "[7 + 12 + 3] + 9 (AGI/3) + 5 (Pontaria) = 36"
+  // Teste: rola nd20 (n vem do atributo) e vale o MAIOR dado (não soma) + partes fixas. Ex.: "[14, 7 → 14] + 3 (FOR/3) + 1 (Luta) = 18"
   const test = (n:number, parts:[string,number][]) => { const r = rollDice(n,20); const ex = parts.filter(p=>p[1]!==0)
-    const total = sum(r) + ex.reduce((t,p)=>t+p[1],0)
-    return { total, text:`[${r.join(' + ')}]${ex.map(([l,v])=>` ${sgn(v)} ${Math.abs(v)}${l?` (${l})`:''}`).join('')} = ${total}` } }
+    const total = bestRoll(r) + ex.reduce((t,p)=>t+p[1],0)
+    return { total, text:`[${r.length>1 ? `${r.join(', ')} → ${bestRoll(r)}` : r[0]}]${ex.map(([l,v])=>` ${sgn(v)} ${Math.abs(v)}${l?` (${l})`:''}`).join('')} = ${total}` } }
   const rollAttr = (a:Attr) => { const v = d.attrs[a]; say(`${ATTR_NAMES[a]} (${diceCount(v)}d20): ${test(diceCount(v),[]).text}`) }
   const rollSkill = (p:Row) => say(`${p.nome||'Perícia'} (${skillLabel(s,p)}): ${test(skillDice(s,p),[['bônus',skillBonus(p,s)]]).text}`)
   const rollIni = () => ini && rollSkill(ini)
@@ -79,7 +79,7 @@ export function SheetView({ s, setS, ro=false, gmItems }: { s:Sheet; setS:(f:(s:
   const skills = <section className="panel"><h2>Perícias</h2>
     <div className="sk shd"><span style={{width:36}}/><span className="sn">Perícia</span><span style={{width:66}}>Atrib.</span><span style={{width:56}}>Bônus</span><span style={{width:62}}>Rolagem</span></div>
     {s.pericias.map((p,i)=><div className="sk" key={p.id}>
-      <button className="dc" title="nd20 (pelo atributo) + bônus" onClick={()=>rollSkill(p)}>🎲</button>
+      <button className="dc" title="nd20 (pelo atributo): vale o maior dado + bônus" onClick={()=>rollSkill(p)}>🎲</button>
       {p.base?<b className="sn">{p.nome}</b>:<input className="sn" placeholder="Nome" value={p.nome??''} onChange={e=>upP(i,{nome:e.target.value})}/>}
       <select value={p.attr??''} onChange={e=>upP(i,{attr:e.target.value})}><option value="">—</option>{ATTRS.map(a=><option key={a}>{a}</option>)}</select>
       <input type="number" className="bn" value={p.bonus??0} onChange={e=>upP(i,{bonus:clamp(+e.target.value,-99,999)})}/>
@@ -102,7 +102,7 @@ export function SheetView({ s, setS, ro=false, gmItems }: { s:Sheet; setS:(f:(s:
       <div className="left">
         <section className="panel"><h2>Atributos <small className={pt.restantes<0?'neg':''}>{pt.restantes} pontos livres</small></h2>
           {ATTRS.map(a=><div className="al" key={a} style={{'--c':COLORS[a]} as any}>
-            <button className="dc" title="nd20 pelo atributo" onClick={()=>rollAttr(a)}>🎲</button>
+            <button className="dc" title="nd20 pelo atributo: vale o maior dado" onClick={()=>rollAttr(a)}>🎲</button>
             <b className="aa">{a}</b><span className="lbl an">{ATTR_NAMES[a]}{d.attrs[a]!==s.attrs[a]?` (ef. ${d.attrs[a]})`:''}</span>
             <span className="num"><button onClick={()=>setAttr(a,s.attrs[a]-1)}>−</button><input type="number" value={s.attrs[a]} onChange={e=>setAttr(a,+e.target.value)}/><button onClick={()=>setAttr(a,s.attrs[a]+1)}>+</button></span></div>)}</section>
 
