@@ -113,6 +113,11 @@ export function attackInfo(s:Sheet, e:Equip) {
 }
 export const rollDice = (n:number, f:number) => Array.from({length:Math.max(1,n)},()=>1+Math.floor(Math.random()*f))
 export function parseDice(t:string) { const m=/(\d+)d(\d+)\s*([+-]\s*\d+)?/i.exec(t); return m ? { n:+m[1], f:+m[2], mod:m[3]?+m[3].replace(/\s/g,''):0 } : null }
+// Dano da arma: "1d6+2", "2d4"... ou número fixo ("2" = 2 de dano). null = não dá para rolar dano (ex.: armadura "+2 defesa").
+export function parseDamage(t?:string): { n:number; f:number; mod:number } | null {
+  const dd = parseDice(t ?? ''); if (dd) return dd
+  const m = /^\s*\+?(\d+)\s*$/.exec(t ?? ''); return m ? { n:0, f:0, mod:+m[1] } : null
+}
 export const emptySheet = (): Sheet => ({
   nome:'', jogador:'', idade:null, classe:'', nivel:1, xp:0, attrs:{FOR:5,AGI:5,MEN:5,CAR:5,VIT:5}, pv:0, mana:0, aura:0,
   conds:[], efeitos:[], pericias:BASE_SKILLS.map(b=>({...b,bonus:0})), equip:[], inv:[], habs:[],
@@ -133,6 +138,8 @@ export function effAttrs(s:Sheet): Record<Attr,number> {
 }
 function skillMods(s:Sheet): Record<string,number> { const m:Record<string,number> = {}
   active(s).forEach(c=>{ for (const [k,v] of Object.entries(c.sk ?? {})) m[k] = (m[k] ?? 0) + v }); return m }
+// Defesa base de todo mundo. Era 5 (+ nível); agora 0. Se achar que ficou baixa/alta demais, mude só este número.
+export const DEF_BASE = 0
 export function derive(s:Sheet) {
   const e = effAttrs(s)
   const esqMod = active(s).reduce((t,c)=>t+(c.esq ?? 0),0)
@@ -145,7 +152,8 @@ export function derive(s:Sheet) {
     manaMax: e.MEN*10 + worn(s).reduce((t,x)=>t+x.mana,0),
     // Esquiva Seca NÃO é teste (sem dados): média de AGI e VIT (valor fixo) + condições.
     esquiva: Math.floor((e.AGI + e.VIT)/2) + esqMod,
-    defesa: 5 + s.nivel + Math.floor(e.VIT/5) + bloqueio,
+    // Defesa (redução fixa de dano): NÃO cresce com o nível. Vem da Vitalidade e dos equipamentos (bloqueio).
+    defesa: DEF_BASE + Math.floor(e.VIT/5) + bloqueio,
   }
 }
 export const clamp = (v:number, min:number, max:number) => Math.max(min, Math.min(max, Math.trunc(Number.isFinite(v)?v:min)))
