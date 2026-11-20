@@ -1,12 +1,13 @@
 import { describe, it, expect } from 'vitest'
-import { MAX_LEVEL, XP_THRESHOLDS, emptySheet, derive, normalize, levelInfo, pontos, parseDice, skillBonus, skillDice, skillLabel, diceCount, attackInfo, CATALOG, mergeSkills, isBroken, BASE_SKILLS, effAttrs, advanceTurn, consumeItem, castHab, habCost, parseCost, rollDur, fxText, cleanFx, hasFx, type Equip } from './rules'
+import { MAX_LEVEL, XP_THRESHOLDS, emptySheet, derive, normalize, levelInfo, pontos, parseDice, skillBonus, skillDice, skillLabel, diceCount, attackInfo, CATALOG, mergeSkills, parseDamage, DEF_BASE, isBroken, BASE_SKILLS, effAttrs, advanceTurn, consumeItem, castHab, habCost, parseCost, rollDur, fxText, cleanFx, hasFx, type Equip } from './rules'
 const shield = (b:number, dur=5):Equip => ({id:'1',nome:'E',tipo:'',espacos:1,dur,durMax:5,dano:'',bloqueio:b,mana:0,equipado:true})
 const base = () => { const s = emptySheet(); s.attrs = {FOR:0,AGI:0,MEN:0,CAR:0,VIT:0}; return s }
 describe('fórmulas', () => {
   it('PV = VIT*5 + 5 por nível', () => { const s=base(); s.nivel=3; expect(derive(s).pvMax).toBe(15); s.nivel=4; expect(derive(s).pvMax).toBe(20); s.attrs.VIT=6; expect(derive(s).pvMax).toBe(50) })
   it('Aura e Mana', () => { const s=base(); s.attrs.FOR=6; s.attrs.MEN=5; const d=derive(s); expect(d.auraMax).toBe(60); expect(d.manaMax).toBe(50) })
-  it('Defesa', () => { const s=base(); s.nivel=2; s.attrs.VIT=7; expect(derive(s).defesa).toBe(8)
-    s.equip=[shield(2)]; expect(derive(s).defesa).toBe(10); s.equip=[shield(2,0)]; expect(derive(s).defesa).toBe(8) })
+  it('Defesa: vem da VIT e do bloqueio, NÃO do nível', () => { const s=base(); s.nivel=2; s.attrs.VIT=7; expect(derive(s).defesa).toBe(1)
+    s.equip=[shield(2)]; expect(derive(s).defesa).toBe(3); s.equip=[shield(2,0)]; expect(derive(s).defesa).toBe(1)
+    const a=base(); a.attrs.VIT=10; a.nivel=1; const d1=derive(a).defesa; a.nivel=50; expect(derive(a).defesa).toBe(d1); expect(DEF_BASE).toBe(0) })
   it('Esquiva seca = média de AGI e VIT + condições', () => { const s=base(); s.attrs.AGI=9; s.attrs.VIT=6
     expect(derive(s).esquiva).toBe(7); s.conds=[{id:'a',nome:'Cansado'},{id:'b',nome:'Cego'}]; expect(derive(s).esquiva).toBe(3) })
   it('Cajado +50 mana', () => { const s=base(); s.equip=[{...shield(0),mana:50}]; expect(derive(s).manaMax).toBe(50) })
@@ -41,7 +42,7 @@ describe('fórmulas', () => {
     expect(mergeSkills(r)).toEqual(r); expect(normalize({...s,pericias:r}).pericias).toEqual(r) })
   it('durabilidade: máx 0 = sem durabilidade (não quebra); máx>0 e atual 0 = quebrado', () => {
     expect(isBroken({...shield(2,0),durMax:0})).toBe(false); expect(isBroken(shield(2,0))).toBe(true); expect(isBroken(shield(2,3))).toBe(false)
-    const s=base(); s.equip=[{...shield(2,0),durMax:0}]; expect(derive(s).defesa).toBe(8); s.equip=[shield(2,0)]; expect(derive(s).defesa).toBe(6) })
+    const s=base(); s.equip=[{...shield(2,0),durMax:0}]; expect(derive(s).defesa).toBe(2); s.equip=[shield(2,0)]; expect(derive(s).defesa).toBe(0) })
   it('equipamento vestido soma atributo e sai ao desequipar ou quebrar', () => {
     const s=base(); s.attrs.FOR=5; s.equip=[{...shield(0),bAttr:{FOR:3,VIT:2},equipado:true}]
     expect(effAttrs(s).FOR).toBe(8); expect(derive(s).auraMax).toBe(80); expect(derive(s).pvMax).toBe(15)
@@ -87,4 +88,7 @@ describe('fórmulas', () => {
   it('texto e limpeza do efeito', () => {
     expect(fxText({attr:{FOR:3},dur:'1d4',tick:{pv:-2},now:{mana:10}})).toBe('FOR +3 · +10 Mana · −2 PV/turno · por 1d4 turno(s)')
     expect(cleanFx({attr:{FOR:0},now:{pv:0}})).toBe(undefined); expect(cleanFx({dur:' 3 ',now:{pv:5,mana:0}})).toEqual({dur:'3',now:{pv:5}}); expect(hasFx({dur:'3'})).toBe(false) })
+  it('dano da arma: dados, número fixo ou nada', () => {
+    expect(parseDamage('1d6+2')).toEqual({n:1,f:6,mod:2}); expect(parseDamage('2')).toEqual({n:0,f:0,mod:2}); expect(parseDamage(' +3 ')).toEqual({n:0,f:0,mod:3})
+    expect(parseDamage('+2 defesa')).toBe(null); expect(parseDamage('')).toBe(null); expect(parseDamage(undefined)).toBe(null) })
 })
