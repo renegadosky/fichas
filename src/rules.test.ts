@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { MAX_LEVEL, XP_THRESHOLDS, emptySheet, derive, normalize, levelInfo, pontos, parseDice, skillBonus, skillDice, skillLabel, diceCount, attackInfo, CATALOG, mergeSkills, parseDamage, DEF_BASE, isBroken, BASE_SKILLS, effAttrs, advanceTurn, consumeItem, castHab, habCost, parseCost, rollDur, fxText, cleanFx, hasFx, type Equip } from './rules'
+import { MAX_LEVEL, XP_THRESHOLDS, emptySheet, derive, normalize, levelInfo, pontos, parseDice, skillBonus, skillDice, skillLabel, diceCount, attackInfo, CATALOG, mergeSkills, bestRoll, parseDamage, DEF_BASE, isBroken, BASE_SKILLS, effAttrs, advanceTurn, consumeItem, castHab, habCost, parseCost, rollDur, fxText, cleanFx, hasFx, type Equip } from './rules'
 const shield = (b:number, dur=5):Equip => ({id:'1',nome:'E',tipo:'',espacos:1,dur,durMax:5,dano:'',bloqueio:b,mana:0,equipado:true})
 const base = () => { const s = emptySheet(); s.attrs = {FOR:0,AGI:0,MEN:0,CAR:0,VIT:0}; return s }
 describe('fórmulas', () => {
@@ -91,4 +91,5 @@ describe('fórmulas', () => {
   it('dano da arma: dados, número fixo ou nada', () => {
     expect(parseDamage('1d6+2')).toEqual({n:1,f:6,mod:2}); expect(parseDamage('2')).toEqual({n:0,f:0,mod:2}); expect(parseDamage(' +3 ')).toEqual({n:0,f:0,mod:3})
     expect(parseDamage('+2 defesa')).toBe(null); expect(parseDamage('')).toBe(null); expect(parseDamage(undefined)).toBe(null) })
+  it('teste com vários d20 vale o maior dado, não a soma', () => { expect(bestRoll([14,7])).toBe(14); expect(bestRoll([3])).toBe(3); expect(bestRoll([9,20,1])).toBe(20); expect(bestRoll([])).toBe(0) })
 })
