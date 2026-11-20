@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ATTRS, ATTR_NAMES, COINS, RANKS, CONDITIONS, CATALOG, XP_THRESHOLDS, derive, normalize, clamp, levelInfo, pontos, skillBonus, skillDice, skillLabel, diceCount, attackInfo, weaponAttr, weaponSkillId, isBroken, rollDice, parseDice, advanceTurn, consumeItem, castHab, hasFx, fxText, habCost, costText, cleanAttr, type Sheet, type Row, type Equip, type Attr } from './rules'
+import { ATTRS, ATTR_NAMES, COINS, RANKS, CONDITIONS, CATALOG, XP_THRESHOLDS, derive, normalize, clamp, levelInfo, pontos, skillBonus, skillDice, skillLabel, diceCount, attackInfo, weaponAttr, weaponSkillId, isBroken, rollDice, parseDice, parseDamage, advanceTurn, consumeItem, castHab, hasFx, fxText, habCost, costText, cleanAttr, type Sheet, type Row, type Equip, type Attr } from './rules'
 
 import { uid, fileToAvatar, Avatar } from './ui'
 import { FxEditor, AttrFields } from './fx'
@@ -41,11 +41,13 @@ export function SheetView({ s, setS, ro=false, gmItems }: { s:Sheet; setS:(f:(s:
   const rollSkill = (p:Row) => say(`${p.nome||'Perícia'} (${skillLabel(s,p)}): ${test(skillDice(s,p),[['bônus',skillBonus(p,s)]]).text}`)
   const rollIni = () => ini && rollSkill(ini)
   // Ataque + dano juntos numa mensagem só.
-  const attack = (e:Equip) => { const a = attackInfo(s,e), dd = parseDice(e.dano)
+  const attack = (e:Equip) => { const a = attackInfo(s,e), dd = parseDamage(e.dano)
     const atk = test(a.n,[[`${a.attr}/3`,a.mod],[a.periciaNome||'perícia',a.pericia],['acessório',a.acess]])
     let dmg = ''
-    if (dd) { const r = rollDice(Math.min(dd.n,50),dd.f); const parts:[string,number][] = [['arma',dd.mod],[a.attr,a.val]].filter(p=>p[1]!==0) as any
-      dmg = ` | Dano: [${r.join(' + ')}]${parts.map(([l,v])=>` ${sgn(v)} ${Math.abs(v as number)} (${l})`).join('')} = ${sum(r)+parts.reduce((t,p)=>t+(p[1] as number),0)}` }
+    if (dd) { const r = dd.n>0 ? rollDice(Math.min(dd.n,50),dd.f) : []; const parts:[string,number][] = [['arma',dd.mod],[a.attr,a.val]].filter(p=>p[1]!==0) as any
+      // sem dados (dano fixo): "2 (arma) + 5 (FOR)"; com dados: "[3] + 5 (FOR)"
+      const txt = parts.map(([l,v],i)=> r.length===0 && i===0 ? `${v} (${l})` : ` ${sgn(v)} ${Math.abs(v)} (${l})`).join('')
+      dmg = ` | Dano: ${r.length?`[${r.join(' + ')}]`:''}${txt} = ${sum(r)+parts.reduce((t,p)=>t+(p[1] as number),0)}` }
     say(`${e.nome} — Ataque (${a.n}d20): ${atk.text}${dmg}`) }
   const roll = (label:string, n:number, f:number, mod=0) => { const r = rollDice(n,f); const t = sum(r)+mod
     say(`${label}: ${r.join(' + ')}${mod?(mod>0?' + ':' − ')+Math.abs(mod):''} = ${t}`) }
@@ -66,7 +68,7 @@ export function SheetView({ s, setS, ro=false, gmItems }: { s:Sheet; setS:(f:(s:
   const upH = (i:number, p:Partial<Row>) => P({ habs:s.habs.map((x,j)=>j===i?{...x,...p}:x) })
   const upI = (i:number, p:Partial<Row>) => P({ inv:s.inv.map((x,j)=>j===i?{...x,...p}:x) })
   const addCatalog = (i:number) => { const c = CATALOG[i]
-    P({ equip:[...s.equip,{ id:uid(), nome:c[0], tipo:c[1], espacos:c[2], dur:c[3], durMax:c[3], dano:c[4], bloqueio:c[5]??0, mana:c[6]??0, equipado:false }] }) }
+    P({ equip:[...s.equip,{ id:uid(), nome:c[0], tipo:c[1], espacos:c[2], dur:c[3], durMax:c[3], dano:c[4], bloqueio:c[5] ?? Number(/\+(\d+)\s*defesa/i.exec(c[4])?.[1] ?? 0), mana:c[6]??0, equipado:false }] }) }
   const addGm = (id:string) => { const g = gmItems?.find(x=>x.id===id)?.data; if (!g) return
     if (g.cat==='equip') P({ equip:[...s.equip,{ id:uid(), nome:g.nome, tipo:g.tipo??'', espacos:g.espacos??0, dur:g.dur??0, durMax:g.durMax??g.dur??0, dano:g.dano??'', bloqueio:g.bloqueio??0, mana:g.mana??0, equipado:false, ...(g.atq?{atq:g.atq}:{}), ...(g.bonus?{bonus:g.bonus}:{}), ...(g.bAttr?{bAttr:g.bAttr}:{}) }] })
     else if (g.cat==='hab') P({ habs:[...s.habs,{ id:uid(), nome:g.nome, custo:g.custo??'', desc:g.desc??'', ...(g.cMana?{cMana:g.cMana}:{}), ...(g.cAura?{cAura:g.cAura}:{}), ...(g.cPv?{cPv:g.cPv}:{}), ...(g.fx?{fx:g.fx}:{}) }] })
@@ -124,7 +126,7 @@ export function SheetView({ s, setS, ro=false, gmItems }: { s:Sheet; setS:(f:(s:
         {tab==='Combate' && <section className="panel">
           <div className="row"><input style={{flex:1}} value={expr} onChange={e=>setExpr(e.target.value)} onKeyDown={e=>e.key==='Enter'&&rollExpr()} placeholder="Rolar dados (ex.: 2d6+3)"/><button className="pri" onClick={rollExpr}>🎲</button></div>
           <h2 style={{marginTop:14}}>Ataques</h2>
-          {equipped.length>0 ? equipped.map(e=>{ const dd=parseDice(e.dano), a=attackInfo(s,e); return <div className="wp" key={e.id}><div style={{flex:1}}><b>{e.nome}{isBroken(e)&&' (quebrado)'}</b><div className="lbl">{e.dano} · {a.n}d20+{a.mod+a.pericia+a.acess} · dano +{a.val} ({a.attr})</div></div>{dd&&<button className="pri" title="Ataque + dano" onClick={()=>attack(e)}>🎲</button>}</div>}) : <p className="lbl">Equipe uma arma na aba Inventário.</p>}
+          {equipped.length>0 ? equipped.map(e=>{ const dd=parseDamage(e.dano), a=attackInfo(s,e); return <div className="wp" key={e.id}><div style={{flex:1}}><b>{e.nome}{isBroken(e)&&' (quebrado)'}</b><div className="lbl">{e.dano} · {a.n}d20+{a.mod+a.pericia+a.acess} · dano +{a.val} ({a.attr})</div></div>{dd&&<button className="pri" title="Ataque + dano" onClick={()=>attack(e)}>🎲</button>}</div>}) : <p className="lbl">Equipe uma arma na aba Inventário.</p>}
           <div className="row" style={{marginTop:8}}>{ini&&<button onClick={rollIni}>🎲 Iniciativa</button>}<button onClick={passTurn} disabled={!s.conds.length&&!efs.length} title="Aplica dano/cura por turno e diminui as durações">⏭ Passar turno</button></div>
           <h2 style={{marginTop:14}}>Condições</h2>
           <div className="chips">{CONDITIONS.map(c=><button key={c.nome} title={c.efeito} onClick={()=>addCond(c.nome)}>+ {c.nome}</button>)}</div>
@@ -153,7 +155,7 @@ export function SheetView({ s, setS, ro=false, gmItems }: { s:Sheet; setS:(f:(s:
 
         {tab==='Inventário' && <>
           <section className="panel"><h2>Equipamentos</h2>
-            {s.equip.map((e,i)=>{ const dd=parseDice(e.dano), op=openEq===e.id; return <div className="eq" key={e.id} style={isBroken(e)?{opacity:.55}:undefined}>
+            {s.equip.map((e,i)=>{ const dd=parseDamage(e.dano), op=openEq===e.id; return <div className="eq" key={e.id} style={isBroken(e)?{opacity:.55}:undefined}>
               <div className="row"><input type="checkbox" className="ck" checked={e.equipado} onChange={ev=>upE(i,{equipado:ev.target.checked})} title="Equipado"/>
                 <div style={{flex:1,minWidth:120}}><b>{e.nome||'(sem nome)'}</b><div className="lbl">{e.dano} · {e.durMax>0?`${e.dur}/${e.durMax}`:'sem durabilidade'}{cleanAttr(e.bAttr)?` · ${fxText({attr:e.bAttr})}`:''}</div></div>
                 {dd&&<button title="Ataque + dano" onClick={()=>attack(e)}>🎲</button>}<button onClick={()=>setOpenEq(op?null:e.id)}>{op?'▲':'✎'}</button></div>
