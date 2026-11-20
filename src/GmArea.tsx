@@ -74,6 +74,9 @@ export function GmArea({ userId, items, reloadItems, onOpen, nav, setNav }: { us
     if (error) setMsg(error.message); else onOpen(data as Rec, 'owner') }
   const dup = async (r:Rec) => { const { error } = await supabase.from('sheets').insert({ data:{ ...r.data, nome:(r.data.nome||'Sem nome')+' (cópia)' }, kind:r.kind, campaign_id:r.campaign_id }); if (error) setMsg(error.message); else loadSheets() }
   const del = async (r:Rec) => { if (!confirm('Excluir esta ficha definitivamente?')) return; await supabase.from('sheets').delete().eq('id',r.id); loadSheets() }
+  // Tira a ficha de um JOGADOR da campanha (ele continua com a ficha, só sai da campanha). Precisa da função gm_remove_from_campaign no banco.
+  const removeFromCamp = async (r:Rec) => { if (!confirm(`Tirar "${r.data.nome||'esta ficha'}" da campanha?\nO jogador continua com a ficha dele; ela só deixa de aparecer aqui.`)) return
+    const { error } = await supabase.rpc('gm_remove_from_campaign', { p_sheet:r.id }); if (error) setMsg(error.message); else { setMsg(''); loadSheets() } }
   const delItem = async (g:GmItem) => { if (!confirm(`Excluir "${g.data.nome}"? (fichas que já receberam o item continuam com ele)`)) return; await supabase.from('gm_items').delete().eq('id',g.id); reloadItems() }
 
   const head = <div className="row"><button className={sub==='camp'?'pri':''} onClick={()=>{ setSub('camp'); setCur(null) }}>Campanhas</button>
@@ -103,6 +106,7 @@ export function GmArea({ userId, items, reloadItems, onOpen, nav, setNav }: { us
     {t.novo && <button className="pri" style={{marginBottom:10}} onClick={()=>newSheet(tab)}>{t.novo}</button>}
     {tab!=='player' && <p className="lbl">Os jogadores nunca veem {tab==='npc'?'NPCs':'inimigos'}.</p>}
     {list.map(r=><SheetCard key={r.id} r={r} onOpen={()=>onOpen(r, r.kind==='player'?'gm':'owner')}>
-      {r.kind!=='player' && <><button onClick={()=>dup(r)} title="Duplicar">⧉</button><button className="del" onClick={()=>del(r)}>🗑</button></>}</SheetCard>)}
+      {r.kind!=='player' ? <><button onClick={()=>dup(r)} title="Duplicar">⧉</button><button className="del" onClick={()=>del(r)}>🗑</button></>
+        : <button className="del" title="Tirar esta ficha da campanha" onClick={()=>removeFromCamp(r)}>✕ Tirar da campanha</button>}</SheetCard>)}
     {!list.length && <p className="lbl">{tab==='player'?'Nenhum jogador anexou ficha a esta campanha ainda. Passe o código acima.':'Nada aqui ainda.'}</p>}</div>
 }
