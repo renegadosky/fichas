@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { supabase } from './supabase'
 import { normalize, emptySheet, type Sheet } from './rules'
 import { SheetView } from './SheetView'
+import { giveSheet } from './give'
 import type { Rec, Mode, GmItem, Campaign } from './db'
 
 export function Editor({ rec, mode, gmItems, onBack, onCampaign }: { rec:Rec; mode:Mode; gmItems?:GmItem[]; onBack:()=>void; onCampaign?:(c:{ id:string; nome:string })=>void }) {
@@ -25,6 +26,11 @@ export function Editor({ rec, mode, gmItems, onBack, onCampaign }: { rec:Rec; mo
   const leave = async () => { if (!confirm('Sair da campanha? O mestre e os outros jogadores deixam de ver esta ficha.')) return
     const { error } = await supabase.rpc('leave_campaign', { p_sheet:rec.id }); if (error) return setErr(error.message)
     setCid(null); setVis(false); setCfg(false) }
+  // Dar a ficha: antes grava o que ainda estiver pendente, para a pessoa receber a versão mais recente.
+  const give = async () => { setErr(''); clearTimeout(timer.current); if (dirty.current) await save()
+    if (dirty.current || conflict) return setErr('Não deu para salvar as últimas alterações. Tente de novo em instantes.')
+    const res = await giveSheet(rec.id, s.nome); if (res.error) return setErr(res.error)
+    if (res.done) { clearTimeout(timer.current); onBack() } }
   const setVisible = async (v:boolean) => { const { error } = await supabase.from('sheets').update({ visible_to_party:v }).eq('id',rec.id); if (error) setErr(error.message); else setVis(v) }
 
   // ---- salvamento com controle de versão ----
@@ -59,6 +65,7 @@ export function Editor({ rec, mode, gmItems, onBack, onCampaign }: { rec:Rec; mo
     {cfg && isOwner && rec.kind==='player' && <section className="panel cfgp"><h2>Configurações da ficha</h2>
       <label className="sw"><input type="checkbox" checked={vis} disabled={!cid} onChange={e=>setVisible(e.target.checked)}/>
         <span><b>Deixar os outros jogadores da campanha verem esta ficha</b><br/><span className="lbl">Eles só conseguem olhar, nunca editar. {cid?'':'Anexe a ficha a uma campanha para usar esta opção.'}</span></span></label>
+      <div className="row"><button onClick={give}>🎁 Dar esta ficha para outra conta…</button><span className="lbl">Passa a ficha para outra pessoa (pelo e-mail). Ela sai da campanha e da sua conta.</span></div>
       <p className="lbl">{cid ? <>O mestre da campanha <b>{camp?.nome}</b> sempre vê e pode editar as fichas anexadas.</> : 'Sem campanha, só você enxerga esta ficha.'}</p></section>}
     {mode==='gm' && <div className="info">Você está editando a ficha de um jogador como mestre.</div>}
     {ro && <div className="info">Somente leitura — você está vendo a ficha de outro jogador.</div>}
