@@ -3,6 +3,7 @@ import { supabase } from './supabase'
 import { emptySheet, normalize } from './rules'
 import { Editor } from './Editor'
 import { GmArea, GM_NAV0, type GmNav } from './GmArea'
+import { giveSheet } from './give'
 import { CampaignPage } from './CampaignPage'
 import { Avatar } from './ui'
 import type { Rec, Mode, GmItem } from './db'
@@ -21,8 +22,7 @@ export default function App() {
 
   const loadItems = async () => { const { data } = await supabase.from('gm_items').select('id,data').order('created_at'); setItems((data ?? []) as GmItem[]) }
   const load = async () => { if (!user) return
-    const { data:p } = await supabase.from('profiles').select('role').eq('id',user.id).single(); const isGm = p?.role==='gm'; setGm(isGm)
-    if (isGm) loadItems()
+    setGm(true); loadItems()  // qualquer conta pode ser mestre das próprias campanhas; os itens do mestre são só de quem criou
     // minhas fichas de personagem (NPCs e inimigos ficam só na Área do mestre)
     const { data, error } = await supabase.from('sheets').select('*').eq('owner_id',user.id).eq('kind','player').order('updated_at',{ascending:false})
     if (error) return setMsg(error.message)
@@ -49,6 +49,7 @@ export default function App() {
     else if (up && !r.data.session) setMsg(r.data.user && r.data.user.identities?.length === 0 ? 'Este e-mail já tem cadastro. Use "Entrar".' : 'Enviamos um e-mail de confirmação. Confira a caixa de entrada e também o spam.') }
   const create = async () => { const { data, error } = await supabase.from('sheets').insert({ data: emptySheet() }).select().single(); if (error) setMsg(error.message); else setOpen({ rec:data as Rec, mode:'owner' }) }
   const remove = async (id:string) => { if (ok('Excluir esta ficha definitivamente?')) { await supabase.from('sheets').delete().eq('id',id); load() } }
+  const give = async (r:Rec) => { const res = await giveSheet(r.id, nm(r).nome); if (res.error) setMsg(res.error); else if (res.done) { await load(); setMsg('Ficha entregue ✔') } }
   if (!ready) return <div className="wrap">Carregando…</div>
   if (!user) return <div className="wrap"><div className="panel" style={{maxWidth:360,margin:'40px auto'}}><h2>Ficha de RPG</h2>
     <div className="row"><input style={{width:'100%'}} placeholder="E-mail" value={email} onChange={e=>setEmail(e.target.value)}/></div>
@@ -67,7 +68,7 @@ export default function App() {
         {list.map(r=>{ const d = nm(r); return <div className="panel card" key={r.id}><Avatar src={d.foto} name={d.nome} size={52}/>
           <div style={{flex:1,minWidth:140}}><b>{d.nome||'(sem nome)'}</b><div className="lbl">{d.classe||'—'} · nível {d.nivel}</div></div>
           {r.campaign_id && <span className="cpill ok">🏰 {campNames[r.campaign_id] ?? 'Campanha'}</span>}
-          <button onClick={()=>setOpen({ rec:r, mode:'owner' })}>Abrir</button><button className="del" onClick={()=>remove(r.id)}>Excluir</button></div> })}
+          <button onClick={()=>setOpen({ rec:r, mode:'owner' })}>Abrir</button><button onClick={()=>give(r)} title="Dar esta ficha para outra conta">🎁 Dar</button><button className="del" onClick={()=>remove(r.id)}>Excluir</button></div> })}
         {!list.length && <p className="lbl">Nenhuma ficha ainda.</p>}
         {groups.map(([cid, rs])=><div key={cid}><h2 style={{marginTop:22}}>Grupo — {campNames[cid] ?? 'Campanha'}</h2>
           {rs.map(r=>{ const d = nm(r); return <div className="panel card" key={r.id}><Avatar src={d.foto} name={d.nome} size={52}/>
